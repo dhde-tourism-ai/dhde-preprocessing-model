@@ -39,7 +39,7 @@ existing node's YAML, adjust:
 | `camera` | `gates`: list of `{name, person_csv or license_plate_csv, face_csv?}`. Set `enabled: false` with a `reason` if no sensor exists (don't fabricate one — see Katsuyama). |
 | `weather` | `station_name`, `station_id` (look up in code4fukui/jma_station, confirms which physical station is nearest), plus `prec_no`/`block_no`/`page` (JMA's own addressing for the live scrape endpoint — see caveat below) and `start_date`. |
 | `rsi` | `repo`, `area_name` (a municipality tracked in code4fukui/fukui-kanko-trend-data's per-year folders) or `null` to use the prefecture-wide total only. |
-| `hotel` | `repo` — this is regional (Echizen Coast), not node-specific; every node gets the same signal. |
+| `hotel` | `repo` (use a node-specific reservation repo if one exists, e.g. `fukui-station-kanko-reservation` — falls back to the regional `echizen-coast-kanko-reservation` otherwise) and `scope` (`station-specific` or `regional`, just for the report notes). Price-sanity bounds are derived automatically from whichever repo you point at — see caveat below. |
 | `survey` | `repo`, `area_ids` — the 親番号 (parent number) value(s) from fukui-kanko-survey's `area.csv`, **not** its `id` column (see caveat below). |
 | `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API and check the distance before assuming (see caveat below), not just because a node exists. |
 
@@ -72,15 +72,38 @@ it isn't naturally one-row-per-day).
   a clearly-separate, clearly-labeled column, not by loosening this match.
 
 - **Hotel reservation files are forward-looking snapshots, not daily
-  totals.** `echizen-coast-kanko-reservation/data/{date}.csv` — the file
-  named `2025-06-01.csv` contains rows for `date_visit` 2025-06-01
+  totals, and are cleaned through a real glitch-detection/gap-filling
+  pipeline, not a naive day-of read.** `{repo}/data/{date}.csv` — the
+  file named `2025-06-01.csv` contains rows for `date_visit` 2025-06-01
   *through* 2025-08-30 (bookings in hand for the next ~90 days, as of
-  that snapshot day). The most complete count for any `date_visit` is
-  its own day-of snapshot (bookings settle as the date approaches), so
-  `sources/hotel.py` reads only each file's first row rather than
-  reconciling overlapping snapshots. If a file's first row's `date_visit`
-  doesn't match its own filename date (a gap in the forward window),
-  that file is skipped rather than misattributed.
+  that snapshot day). The same `date_visit` appears in ~90 different
+  snapshots, one per day before it — its "booking curve." A teammate's
+  data-quality analysis of this (Colab notebook + methodology doc, see
+  PR discussion) found real problems the naive "just read lead_time=0"
+  approach this module started with was blind to: failed data pulls,
+  frozen/stale snapshots (the feed stopped updating but kept serving the
+  same numbers), values exceeding actual hotel capacity, negative
+  revenue (refunds), impossible room prices, and one-day glitches that
+  revert. `sources/hotel.py` ports that full pipeline (blank bad values
+  rather than drop rows, then fill blanks from the same booking curve's
+  neighbours, gaps of ≤7 snapshots only), and adds `occ`/`adr`/`revpar`
+  columns plus data-quality flag columns (`is_stale`, `was_imputed`,
+  etc.) so nothing is hidden.
+
+  **This repo covers two different hotel datasets, same format, very
+  different price tiers** — `fukui-station-kanko-reservation` (3 hotels
+  near Fukui Station, 585 rooms, used for that node specifically) and
+  `echizen-coast-kanko-reservation` (regional, used for the other 3).
+  The original analysis's price-sanity check used a fixed 3,000–30,000
+  JPY/room range, validated against the Fukui Station repo specifically.
+  Applied as-is to the regional repo (real median price ~64,500 JPY — a
+  pricier market, not bad data), that fixed range wrongly excluded 87%
+  of its rows. Fixed by deriving the price bounds from each repo's own
+  distribution (1st/99th percentile) instead of hardcoding one repo's
+  numbers everywhere — see `_derive_adr_bounds` and the regression test
+  in `tests/test_hotel.py`. Ported the validated *approach*, not the
+  specific *numbers*, since those were tied to which dataset she'd
+  looked at.
 
 - **Rainbow Line's two gates have no `Person.csv` at all** — only
   `LicensePlate.csv` (vehicle counts, since it's a parking-lot entrance)

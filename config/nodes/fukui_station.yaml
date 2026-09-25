@@ -28,7 +28,8 @@ sources:
 
   hotel:
     enabled: true
-    repo: echizen-coast-kanko-reservation
+    repo: fukui-station-kanko-reservation
+    scope: station-specific  # 3 hotels near Fukui Station, 585 rooms total — see hotel.py docstring
 
   survey:
     enabled: true
