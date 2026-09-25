@@ -37,7 +37,7 @@ existing node's YAML, adjust:
 | Source | What a new node's config needs |
 |---|---|
 | `camera` | `gates`: list of `{name, person_csv or license_plate_csv, face_csv?}`. Set `enabled: false` with a `reason` if no sensor exists (don't fabricate one — see Katsuyama). |
-| `weather` | `station_name`, `station_id` (look up in code4fukui/jma_station), `input_csv` (null until a human drops in an obsdl export — see caveat below). |
+| `weather` | `station_name`, `station_id` (look up in code4fukui/jma_station, confirms which physical station is nearest), plus `prec_no`/`block_no`/`page` (JMA's own addressing for the live scrape endpoint — see caveat below) and `start_date`. |
 | `rsi` | `repo`, `area_name` (a municipality tracked in code4fukui/fukui-kanko-trend-data's per-year folders) or `null` to use the prefecture-wide total only. |
 | `hotel` | `repo` — this is regional (Echizen Coast), not node-specific; every node gets the same signal. |
 | `survey` | `repo`, `area_ids` — the 親番号 (parent number) value(s) from fukui-kanko-survey's `area.csv`, **not** its `id` column (see caveat below). |
@@ -88,15 +88,25 @@ it isn't naturally one-row-per-day).
   `gate2_vehicle_count`, deliberately not `gate1_count`, so nothing
   downstream can silently treat a vehicle count as a person count.
 
-- **JMA weather automation is an explicit, unsolved TODO.** The
-  obsdl portal (`https://www.data.jma.go.jp/risk/obsdl/index.php`) is a
-  form/session-driven download, not a stable API — this module expects a
-  human to export a CSV and set `sources.weather.input_csv` in the node's
-  config. The parser in `sources/weather.py` for that export format is
-  **best-effort and unverified against a real export** (none was
-  available while building this) — treat it as a starting point to fix
-  once a real file is in hand, not as settled. Until then every node
-  correctly reports weather as `unavailable` with the TODO in its notes.
+- **JMA weather is fully automated — not the obsdl portal.** The obsdl
+  portal (`https://www.data.jma.go.jp/risk/obsdl/index.php`) really is a
+  form/session-driven download with no stable API, so this does NOT use
+  it. Instead it scrapes JMA's public ETRN hourly-observation pages
+  (`https://www.data.jma.go.jp/obd/stats/etrn/view/{page}.php`), the same
+  approach already proven working in the sibling
+  hokuriku-tourism-ai-governance-dashboard repo's
+  `jma/fetch_jma_monthly.py`. Each node's config carries `prec_no`/
+  `block_no`/`page` (a different addressing scheme than the obsdl
+  `station_id` used to originally confirm the physical station).
+  Fetched days are cached per node under
+  `{workspace_root}/jma_cache/{node}_hourly.csv` — repeated runs only
+  scrape the gap since last time instead of re-fetching full history.
+  This repo's cache was seeded from the sibling dashboard repo's
+  already-fetched 2024-12 → 2026-03 history rather than re-scraping it
+  from scratch. A single bad day (a transient site hiccup, a genuinely
+  missing observation) is caught per-day and doesn't throw away the rest
+  of a run — see the regression test in `tests/test_weather.py` for the
+  bug this was actually hit and fixed.
 
 - **JARTIC (road traffic) coverage was checked empirically, not
   assumed**, by querying the live API with each node's real coordinates:

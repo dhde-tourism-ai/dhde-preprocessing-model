@@ -16,7 +16,10 @@ sources:
     enabled: true
     station_name: "福井 (Fukui)"
     station_id: "57066"
-    input_csv: null
+    prec_no: "57"
+    block_no: "47616"  # Fukui City main station — distinct from Tsuruga (block_no 47631)
+    page: hourly_s1
+    start_date: "2024-12-01"
 
   rsi:
     enabled: true
