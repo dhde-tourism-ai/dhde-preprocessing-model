@@ -30,6 +30,7 @@ sources:
   hotel:
     enabled: true
     repo: echizen-coast-kanko-reservation
+    scope: regional
 
   survey:
     enabled: true
