@@ -1,0 +1,42 @@
+node_key: katsuyama
+label: "Katsuyama (勝山)"
+coordinates:
+  lat: 36.0764
+  lon: 136.5011  # approx., かつやま恐竜の森 area (Fukui Prefectural Dinosaur Museum)
+
+sources:
+  camera:
+    enabled: false
+    reason: >
+      No camera source exists for Katsuyama in fukui-kanko-people-flow-data
+      (only tojinbo-shotaro, fukui-station-east-entrance, and the two
+      rainbow-line gates are present). Do not fabricate one — this gap is
+      real and stays visible in the coverage report as "unavailable."
+
+  weather:
+    enabled: true
+    station_name: "勝山 (Katsuyama)"
+    station_id: "57082"
+    input_csv: null
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "勝山市"
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300019]  # かつやま恐竜の森 エリア only — the main tourist draw closest to
+                          # the (currently unavailable) camera-adjacent landmark, chosen
+                          # over pooling all 6 勝山市 area entries. See PR discussion.
+
+  traffic:
+    enabled: false
+    reason: >
+      No JARTIC monitoring point within range — nearest point on either
+      layer is ~22.5km away (queried live 2026-09-25).

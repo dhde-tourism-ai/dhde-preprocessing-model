@@ -1,0 +1,43 @@
+node_key: fukui_station
+label: "Fukui Station East Entrance (福井駅東口)"
+coordinates:
+  lat: 36.0614
+  lon: 136.2217
+
+sources:
+  camera:
+    enabled: true
+    gates:
+      - name: fukui_station
+        person_csv: fukui-kanko-people-flow-data/full/fukui-station-east-entrance/Person.csv
+        face_csv: fukui-kanko-people-flow-data/full/fukui-station-east-entrance/Face.csv
+
+  weather:
+    enabled: true
+    station_name: "福井 (Fukui)"
+    station_id: "57066"
+    input_csv: null
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: null  # Fukui City is not a tracked municipality in this dataset — total only
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300004]  # 福井駅前 エリア
+
+  traffic:
+    enabled: true
+    point_code: 6810150
+    distance_km: 2.7
+    reason: >
+      Included but flagged — this CCTV counter is ~2.7km from the station
+      coordinates, queried live 2026-09-25. NOT confirmed to sit on the
+      actual road visitors use to reach the station; verify before
+      treating this as a precise local signal.

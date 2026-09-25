@@ -1,0 +1,42 @@
+node_key: tojinbo
+label: "Tojinbo (東尋坊)"
+coordinates:
+  lat: 36.2376685
+  lon: 136.1265737
+
+sources:
+  camera:
+    enabled: true
+    gates:
+      - name: tojinbo
+        person_csv: fukui-kanko-people-flow-data/full/tojinbo-shotaro/Person.csv
+        face_csv: fukui-kanko-people-flow-data/full/tojinbo-shotaro/Face.csv
+
+  weather:
+    enabled: true
+    station_name: "三国 (Mikuni)"
+    station_id: "57001"
+    # No obsdl export dropped in yet — see sources/weather.py docstring.
+    input_csv: null
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "坂井市"  # Sakai City (contains Tojinbo) — only tracked from the 2026 folder onward
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300006]  # 東尋坊 エリア
+
+  traffic:
+    enabled: false
+    reason: >
+      No JARTIC monitoring point within range — nearest point on both the
+      permanent-counter and CCTV layers is ~14km away (queried live
+      2026-09-25). Coastal road into Tojinbo (likely Route 305) is not a
+      national highway/road, which is all JARTIC covers.

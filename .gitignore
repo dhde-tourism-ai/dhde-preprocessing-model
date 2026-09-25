@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Generated per-run — never commit output/, especially not the raw
+# response-level survey parquet (individual demographics + free text).
+# This repo is public; regenerate locally via scripts/build_node.py.
+output/

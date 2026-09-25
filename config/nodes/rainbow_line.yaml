@@ -1,0 +1,53 @@
+node_key: rainbow_line
+label: "Rainbow Line (レインボーライン)"
+coordinates:
+  lat: 35.601189
+  lon: 135.8688963  # レインボーライン エリア, area.csv id 300059
+
+sources:
+  camera:
+    enabled: true
+    # Two separate gates, kept as separate columns rather than summed —
+    # see PR discussion. IMPORTANT: these are parking-lot entrance gates
+    # with NO Person.csv — only LicensePlate.csv (vehicles) and Face.csv
+    # exist here, confirmed against the real repo. That produces
+    # gate1_vehicle_count / gate2_vehicle_count, NOT gate1_count —
+    # deliberately not comparable to the other nodes' person counts.
+    gates:
+      - name: gate1
+        license_plate_csv: fukui-kanko-people-flow-data/full/rainbow-line-parking-lot-1-gate/LicensePlate.csv
+        face_csv: fukui-kanko-people-flow-data/full/rainbow-line-parking-lot-1-gate/Face.csv
+      - name: gate2
+        license_plate_csv: fukui-kanko-people-flow-data/full/rainbow-line-parking-lot-2-gate/LicensePlate.csv
+        face_csv: fukui-kanko-people-flow-data/full/rainbow-line-parking-lot-2-gate/Face.csv
+
+  weather:
+    enabled: true
+    station_name: "美浜 (Mihama)"
+    station_id: "57286"
+    input_csv: null
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "美浜町"
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300059]  # レインボーライン エリア — direct, exact match
+
+  traffic:
+    enabled: true
+    point_code: 6810590
+    distance_km: 5.0
+    reason: >
+      Included but flagged — this CCTV counter is ~5km from the node
+      coordinates, queried live 2026-09-25 (the permanent-counter layer
+      has zero coverage in this whole region). NOT confirmed to sit on
+      the actual toll road access route; verify before treating this as a
+      precise local signal.
