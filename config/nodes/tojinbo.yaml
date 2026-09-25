@@ -15,9 +15,14 @@ sources:
   weather:
     enabled: true
     station_name: "三国 (Mikuni)"
-    station_id: "57001"
-    # No obsdl export dropped in yet — see sources/weather.py docstring.
-    input_csv: null
+    station_id: "57001"  # jma_station.csv id — confirms this is the right physical station
+    # prec_no/block_no/page address this same station on JMA's public ETRN
+    # scrape endpoint (a different numbering than station_id above) — see
+    # sources/weather.py.
+    prec_no: "57"
+    block_no: "1071"
+    page: hourly_a1
+    start_date: "2024-12-01"
 
   rsi:
     enabled: true

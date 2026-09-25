@@ -25,7 +25,10 @@ sources:
     enabled: true
     station_name: "美浜 (Mihama)"
     station_id: "57286"
-    input_csv: null
+    prec_no: "57"
+    block_no: "1010"
+    page: hourly_a1
+    start_date: "2024-12-01"
 
   rsi:
     enabled: true
