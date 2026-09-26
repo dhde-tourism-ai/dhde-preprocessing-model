@@ -190,7 +190,15 @@ def _fetch_and_cache(prec_no: str, block_no: str, page: str, start_date: date, e
         if c not in new_df.columns:
             new_df[c] = ""
     new_df["timestamp"] = pd.to_datetime(new_df["timestamp"])
-    combined = pd.concat([cached, new_df[HOURLY_COLS]], ignore_index=True)
+    # First run (no cache yet): `cached` is an empty frame with object-dtype
+    # columns. pandas 3 no longer ignores empty frames when picking the
+    # result dtype of concat, so concatenating it would silently turn
+    # `timestamp` back into object dtype and break every `.dt` call below.
+    # Skip the concat entirely when there's nothing cached.
+    if cached.empty:
+        combined = new_df[HOURLY_COLS].copy()
+    else:
+        combined = pd.concat([cached, new_df[HOURLY_COLS]], ignore_index=True)
     combined = combined.drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(cache_path, index=False)
@@ -222,7 +230,8 @@ def load_weather(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     for c in ("precip_1h_mm", "temp_c", "humidity_pct", "wind_speed_ms", "sun_1h_h", "snow_depth_cm"):
         hourly[c] = pd.to_numeric(hourly[c], errors="coerce")
 
-    hourly["date"] = hourly["timestamp"].dt.normalize()
+    # Defensive: guarantee datetime dtype regardless of how `hourly` was built.
+    hourly["date"] = pd.to_datetime(hourly["timestamp"]).dt.normalize()
     daily = hourly.groupby("date").agg(
         precip=("precip_1h_mm", "sum"), temp=("temp_c", "mean"), wind=("wind_speed_ms", "mean"),
         sun=("sun_1h_h", "mean"), humidity=("humidity_pct", "mean"), snow_depth=("snow_depth_cm", "mean"),
