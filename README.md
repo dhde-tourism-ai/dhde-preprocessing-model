@@ -174,3 +174,5 @@ repos being cloned. Each test file also documents the specific bug it
 regression-tests, where one was found while building this (the `date`
 column clobber in `camera.py`, the `親番号` vs. `id` mismatch in
 `survey.py`).
+
+<!-- copilot review test, safe to close -->
