@@ -1,0 +1,44 @@
+node_key: mikuni_port
+label: "Mikuni Port (三国湊)"
+coordinates:
+  lat: 36.21432
+  lon: 136.149227  # 三国湊 エリア, area.csv 親番号 300076
+
+sources:
+  camera:
+    enabled: false
+    reason: >
+      No camera source exists for Mikuni Port in fukui-kanko-people-flow-data
+      (checked 2026-09-27). tojinbo-shotaro is ~3km away but measures a
+      different site — do not reuse it here.
+
+  weather:
+    enabled: true
+    station_name: "三国 (Mikuni)"
+    station_id: "57001"  # nearest JMA station, ~3.8km
+    prec_no: "57"
+    block_no: "1071"
+    page: hourly_a1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "坂井市"  # Sakai City — only tracked from the 2026 folder onward
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+    scope: regional
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300076]  # 三国湊 エリア
+
+  traffic:
+    enabled: false
+    reason: >
+      No JARTIC monitoring point within range — nearest CCTV counter
+      (6810135) is ~11.2km away, nearest permanent counter ~12.6km (queried
+      live 2026-09-27).

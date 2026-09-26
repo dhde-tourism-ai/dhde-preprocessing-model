@@ -1,0 +1,47 @@
+node_key: awara_onsen
+label: "Awara Onsen (あわら温泉)"
+coordinates:
+  lat: 36.2256037
+  lon: 136.1941521  # あわら湯のまち エリア, area.csv 親番号 300011
+
+sources:
+  camera:
+    enabled: false
+    reason: >
+      No camera source exists for Awara Onsen in fukui-kanko-people-flow-data
+      (only tojinbo-shotaro, fukui-station-east-entrance, and the two
+      rainbow-line gates are present, checked 2026-09-27). Do not fabricate
+      one — this gap stays visible in the coverage report as "unavailable."
+
+  weather:
+    enabled: true
+    station_name: "三国 (Mikuni)"
+    station_id: "57001"  # nearest JMA station, ~2.7km (same station as Tojinbo)
+    prec_no: "57"
+    block_no: "1071"
+    page: hourly_a1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "あわら市"  # tracked from the 2024 folder onward
+
+  hotel:
+    enabled: true
+    # Despite the generic name, this repo is the Awara Onsen area feed
+    # (its README: "あわら温泉エリア 宿泊予約状況"), same format as the others.
+    repo: fukui-kanko-reservation
+    scope: area-specific
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300011]  # あわら湯のまち エリア (formerly あわら温泉 エリア)
+
+  traffic:
+    enabled: false
+    reason: >
+      No JARTIC monitoring point within range — nearest CCTV counter
+      (6810135) is ~8.1km away, nearest permanent counter ~8.4km (queried
+      live 2026-09-27).
