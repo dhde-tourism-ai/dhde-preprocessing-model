@@ -1,0 +1,52 @@
+node_key: kanazawa_spillover
+label: "Kanazawa Spillover (金沢)"
+coordinates:
+  lat: 36.5781
+  lon: 136.6479  # JR Kanazawa Station — Hokuriku Shinkansen origin, same point
+                 # the dashboard's weather-shield map uses for Kanazawa
+
+sources:
+  # Kanazawa is in Ishikawa Prefecture. Every code4fukui dataset below is
+  # Fukui-only, so those sources are disabled rather than substituted with
+  # a Fukui proxy — a spillover signal built from Fukui data would be
+  # circular.
+  camera:
+    enabled: false
+    reason: >
+      fukui-kanko-people-flow-data covers Fukui sensors only; no Kanazawa
+      sensor exists.
+
+  weather:
+    enabled: true
+    station_name: "金沢 (Kanazawa)"
+    station_id: "56227"
+    prec_no: "56"  # Ishikawa — not 57
+    block_no: "47605"
+    page: hourly_s1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: false
+    reason: >
+      fukui-kanko-trend-data tracks Fukui municipalities only. Do not fall
+      back to its prefecture-wide total — that is Fukui demand, not Kanazawa.
+
+  hotel:
+    enabled: false
+    reason: >
+      No Kanazawa reservation feed exists among the code4fukui repos (all
+      are Fukui areas).
+
+  survey:
+    enabled: false
+    reason: >
+      fukui-kanko-survey (FTAS) has no Ishikawa areas in area.csv.
+
+  traffic:
+    enabled: true
+    point_code: 4810570
+    distance_km: 1.0
+    reason: >
+      Included but flagged — this CCTV counter is ~1.0km from Kanazawa
+      Station, queried live 2026-09-27. NOT confirmed to reflect
+      Fukui-bound travel specifically; it is general city-centre traffic.

@@ -13,9 +13,18 @@ def test_resolve_path_joins_without_mangling_s3_uri(monkeypatch):
     assert resolve_path("some-repo/data.csv") == "s3://my-bucket/dhde/some-repo/data.csv"
 
 
-def test_list_configured_nodes_finds_all_four():
+def test_list_configured_nodes_finds_all_ten():
     nodes = list_configured_nodes()
-    assert nodes == ["fukui_station", "katsuyama", "rainbow_line", "tojinbo"]
+    assert nodes == [
+        "awara_onsen", "eiheiji", "fukui_station", "kanazawa_spillover", "katsuyama",
+        "maruoka_castle", "mikuni_port", "ono_castle_town", "rainbow_line", "tojinbo",
+    ]
+
+
+@pytest.mark.parametrize("node_key", list_configured_nodes())
+def test_every_node_config_loads(node_key):
+    cfg = load_node_config(node_key)
+    assert set(cfg["sources"]) == {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
 
 
 def test_load_node_config_mismatched_key_raises(tmp_path):

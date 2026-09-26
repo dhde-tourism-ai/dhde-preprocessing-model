@@ -1,0 +1,48 @@
+node_key: eiheiji
+label: "Eiheiji Temple (大本山 永平寺)"
+coordinates:
+  lat: 36.0567754
+  lon: 136.3568759  # 大本山 永平寺 エリア, area.csv 親番号 300025
+
+sources:
+  camera:
+    enabled: false
+    reason: >
+      No camera source exists for Eiheiji in fukui-kanko-people-flow-data
+      (checked 2026-09-27). Do not fabricate one — this gap stays visible
+      in the coverage report as "unavailable."
+
+  weather:
+    enabled: true
+    # Closest station is 美山 (Miyama, 57071, ~6.5km), but it records
+    # precipitation only — no temperature, wind, sunshine or humidity.
+    # Fukui (~12km, same plain) is the nearest full-observation station.
+    station_name: "福井 (Fukui)"
+    station_id: "57066"
+    prec_no: "57"
+    block_no: "47616"
+    page: hourly_s1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "永平寺町"  # tracked from the 2024 folder onward
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+    scope: regional
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300025]  # 大本山 永平寺 エリア (formerly 永平寺門前 エリア)
+
+  traffic:
+    enabled: false
+    reason: >
+      No CCTV counter within range — nearest (6810150) is ~10.4km away
+      (queried live 2026-09-27). A permanent counter (6110870) sits ~2.5km
+      away, but traffic.py only reads the CCTV layer; enabling it needs a
+      code change, not just config.
