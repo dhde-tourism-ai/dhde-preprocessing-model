@@ -120,9 +120,10 @@ other limits found so far, with sources and what's still missing, are in
 ## Dropped for now
 Removed from configs per tech lead review of PR #6 (scope is the first six
 nodes). The configs are in this PR's git history if they come back.
-- **Kanazawa Spillover:** Ishikawa Prefecture, so no code4fukui dataset
-  covers it. Revisit if an Ishikawa source (hotel, survey, search trends,
-  or Shinkansen ridership) becomes available.
+- **Kanazawa Spillover:** dropped as a Fukui node (no code4fukui dataset
+  covers Ishikawa). Kanazawa is now covered as an Ishikawa node with its
+  own prefecture's sources (`kanazawa`, see the README's Ishikawa and
+  Toyama section).
 - **Mikuni Port:** survey area 300076, RSI Sakai City (2026 only), weather
   Mikuni, regional hotel. No JARTIC point within 11km. Nearest camera is
   Tojinbo (3.3km).

@@ -1,0 +1,62 @@
+node_key: kaga_onsen
+label: "Kaga Onsen (加賀温泉郷)"
+coordinates:
+  lat: 36.2836
+  lon: 136.3614  # Yamashiro Onsen, centre of the Kaga onsen villages
+
+sources:
+  # Ishikawa node. code4fukui's camera, RSI and hotel datasets are
+  # Fukui-only, so those are disabled rather than filled with Fukui data.
+  # Survey and (Kanazawa only) info_desk come from Milli, Ishikawa's
+  # tourism open data.
+  camera:
+    enabled: false
+    reason: >
+      fukui-kanko-people-flow-data covers Fukui sensors only, and no public
+      people-counting camera data was found for Kaga (checked 2026-09-27).
+
+  rsi:
+    enabled: false
+    reason: >
+      fukui-kanko-trend-data tracks Fukui municipalities only. No Ishikawa
+      equivalent of its Google Business Profile metrics was found.
+
+  hotel:
+    enabled: false
+    reason: >
+      The code4fukui reservation repos cover Fukui areas only; no daily
+      Ishikawa reservation feed was found. Hotel availability comes from
+      the separate rakuten source below.
+
+  weather:
+    enabled: true
+    station_name: "加賀中津原 (Kaga Nakatsuhara)"
+    prec_no: "56"  # Ishikawa — not 57
+    block_no: "0571"  # nearest JMA station, ~4.0km
+    page: hourly_a1
+    start_date: "2024-12-01"
+
+  survey:
+    enabled: true
+    provider: milli  # Ishikawa's QR survey (Milli), not fukui-kanko-survey — see sources/survey_milli.py
+    repo: ishikawa-kanko-survey  # code4fukui, pulls Milli daily
+    facilities_sheet_id: "1IwKFT7ZiNYK4RStuF-1vN3EDf4_L9ohhbC7aeawk10s"  # facility list with 市町
+    cities: ["加賀市"]
+
+  traffic:
+    enabled: false
+    reason: >
+      Nearest CCTV AI-counter point (4810550) is ~6.6km away — farther than
+      any enabled Fukui node (Rainbow Line ~5km). Queried live 2026-09-27.
+
+  monthly_visitors:
+    enabled: true
+    repo: japan-kanko-stat
+    city_lgcode: 17206
+    pref_lgcode: 17
+
+  rakuten:
+    enabled: true
+    search_radius_km: 3
+    lead_days: [1, 7, 30]
+    adult_num: 2

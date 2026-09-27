@@ -177,6 +177,84 @@ merged to main.
   label crashes with `UnicodeEncodeError` on a default Windows terminal
   (cp1252).
 
+## Ishikawa and Toyama nodes
+
+Ishikawa: `kanazawa`, `kaga_onsen`, `komatsu`, `nanao`. Toyama:
+`toyama_station`, `takaoka`, `himi`, `tateyama`. Same pipeline, but
+code4fukui's camera, RSI and hotel datasets are Fukui-only, so each node
+gets only what really exists for its own prefecture — never another
+prefecture's data as a stand-in:
+
+| Source | Ishikawa | Toyama |
+|---|---|---|
+| weather | all four (JMA `prec_no: "56"`) | all four (JMA `prec_no: "55"`) |
+| traffic | kanazawa ~1.2km, komatsu ~5.7km; kaga_onsen/nanao off (~6.6/~7.0km) | toyama_station ~2.3km, takaoka ~1.6km, himi ~1.0km; tateyama off (~19km) |
+| survey | Milli QR survey (`provider: milli`), from 2023-09 | TOYTOS web survey (`provider: toytos`), from 2025-04 |
+| camera | none | toyama_station only — Toyama City AI cameras (`provider: toyama_city`), from 2023-02 |
+| info_desk | kanazawa only — Kanazawa tourist desk enquiries | none |
+| monthly_visitors | all four | all four |
+| rakuten | all four | all four |
+| rsi, hotel | none | none |
+
+**`monthly_visitors` is the cross-prefecture comparison signal.** It
+comes from code4fukui/japan-kanko-stat (JTA digital tourism statistics):
+monthly visitor counts per city and prefecture, measured the same way
+across Japan, from 2021-01. Each month's total is repeated on every day
+of that month (`city_visitors_month`, `pref_visitors_month`). Fukui
+nodes can opt in with the same 5 config lines (Fukui pref lgcode 18,
+e.g. Fukui city 18201, Sakai 18210). Survey counts are **not** comparable
+across prefectures — each prefecture runs its own questionnaire and
+poster placement — so compare survey trends within a prefecture only.
+
+**`rakuten` is the cross-prefecture hotel signal.** Rakuten Travel API:
+hotels listed within 3km of each node, and the share still with a room
+for 2 adults 1, 7 and 30 days before each stay date, plus the cheapest
+charge. Availability on one site, not bookings — so it sits beside
+Fukui's `hotel` source rather than replacing it. Credentials come from
+the `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY` environment variables, never
+config (public repo). **No history:** each run appends a snapshot to
+`rakuten_snapshots/{node}.csv`, so it must run daily; the series starts
+2026-09-27. `.github/workflows/collect-rakuten.yml` runs
+`scripts/collect_rakuten.py` at 09:30 JST every day and commits the
+snapshots to the `live-data` branch; set `DHDE_LIVE_DATA_ROOT` to a
+checkout of that branch to build with them. It needs the
+`RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY` repository secrets, and the
+Rakuten app must not be locked to one IP address (Actions runners
+change). Fukui nodes can opt in with the same config block.
+
+- **Where the data comes from.** Sibling repos, like the Fukui sources:
+  `ishikawa-kanko-survey` and `japan-kanko-stat` (both code4fukui). Over
+  HTTP, via `sources/remote_csv.py` (cached under
+  `{workspace_root}/open_data_cache/`, falls back to the cache if a
+  fetch fails): Milli's facility list and tourist desk Google Sheets,
+  TOYTOS from Toyama's CKAN portal, Toyama City's camera CSV export.
+- **Milli survey rows carry a facility, not a municipality.** The
+  municipality comes from Milli's facility list, joined on (area,
+  facility); ~1% name a facility missing from the list and are dropped
+  (counted in the report notes). TOYTOS rows already carry the
+  municipality they were answered in (回答場所).
+- **Cleaning:** Milli double submissions (same facility, same second)
+  are dropped, keeping the first; TOYTOS has dates only, so only exact
+  duplicate rows are dropped. A day with a total of 0 at a tourist desk
+  or a station camera is treated as missing (closed / camera down), not
+  0. A day only gets a desk total when every desk has a value. Toyama
+  cameras are kept as separate columns per camera, never summed (one
+  person can pass both). Spending answers stay as yen-range text.
+- **Date range of the master table.** Sources are outer-joined on
+  `date`, so a node's table spans every source: it starts 2021-01-01
+  when `monthly_visitors` is on, and runs up to 30 days ahead for
+  Rakuten stay dates (as the Fukui `hotel` source already runs ahead).
+  Other columns are empty in those rows. Nothing is trimmed here —
+  choosing the modeling window is a modeling-stage decision.
+- **Optional sources.** `info_desk`, `monthly_visitors` and `rakuten` are skipped
+  for nodes whose config doesn't declare them, so Fukui output is
+  unchanged.
+- **Real gaps, not pipeline bugs:** `nanao` has 576 survey-free days
+  since 2023-09 (most likely Wakura Onsen closing after the January 2024
+  Noto earthquake); both Toyama Station cameras have no data
+  2023-11-22 → 2023-12-19; the Kanazawa desk's one zero day is
+  2024-01-02, the day after the earthquake.
+
 ## Why survey is handled differently from the other five sources
 
 The other five sources are naturally one-row-per-day. Survey responses

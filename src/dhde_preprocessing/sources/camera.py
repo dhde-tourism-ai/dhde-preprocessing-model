@@ -28,6 +28,7 @@ import pandas as pd
 
 from ..config import resolve_path
 from ..validation import SourceReport, unavailable_report, validate_daily
+from .camera_toyama import load_toyama_camera
 
 FACE_DROP_COLS = {"placement", "object class", "aggregate from", "aggregate to", "total count"}
 
@@ -54,6 +55,10 @@ def load_camera(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     cam_cfg = node_cfg["sources"].get("camera", {})
     if not cam_cfg.get("enabled"):
         return None, unavailable_report("camera", node_key, cam_cfg.get("reason", "camera disabled for this node"))
+
+    # Toyama nodes read Toyama City's AI camera export — see camera_toyama.py.
+    if cam_cfg.get("provider") == "toyama_city":
+        return load_toyama_camera(node_cfg)
 
     gates = cam_cfg["gates"]
     multi_gate = len(gates) > 1

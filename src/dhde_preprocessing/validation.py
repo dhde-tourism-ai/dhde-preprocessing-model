@@ -49,6 +49,18 @@ def unavailable_report(source: str, node_key: str, reason: str) -> SourceReport:
     return SourceReport(source=source, node_key=node_key, status="unavailable", notes=[reason])
 
 
+def blank_zero_days(df: pd.DataFrame, total_col: str, cols: list[str]) -> tuple[pd.DataFrame, int]:
+    """Set `cols` to missing on days where `total_col` is 0; returns (df, days blanked).
+
+    For counters that can't plausibly read 0 on a real day (a station
+    camera, a staffed tourist desk): 0 means closed or broken, and keeping
+    it would look like a real collapse in demand.
+    """
+    zero = df[total_col] == 0
+    df.loc[zero, cols] = float("nan")
+    return df, int(zero.sum())
+
+
 def validate_daily(
     df: pd.DataFrame,
     *,
