@@ -185,9 +185,14 @@ charge. Availability on one site, not bookings — so it sits beside
 Fukui's `hotel` source rather than replacing it. Credentials come from
 the `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY` environment variables, never
 config (public repo). **No history:** each run appends a snapshot to
-`{workspace_root}/rakuten_snapshots/{node}.csv`, so it must run daily;
-the series starts 2026-09-27. Fukui nodes can opt in with the same
-config block.
+`rakuten_snapshots/{node}.csv`, so it must run daily; the series starts
+2026-09-27. `.github/workflows/collect-rakuten.yml` runs
+`scripts/collect_rakuten.py` at 09:30 JST every day and commits the
+snapshots to the `live-data` branch; set `DHDE_LIVE_DATA_ROOT` to a
+checkout of that branch to build with them. It needs the
+`RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY` repository secrets, and the
+Rakuten app must not be locked to one IP address (Actions runners
+change). Fukui nodes can opt in with the same config block.
 
 - **Where the data comes from.** Sibling repos, like the Fukui sources:
   `ishikawa-kanko-survey` and `japan-kanko-stat` (both code4fukui). Over

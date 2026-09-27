@@ -1,3 +1,4 @@
+import sys
 from datetime import date, timedelta
 
 import pandas as pd
@@ -120,3 +121,41 @@ def test_failed_request_never_puts_the_keys_in_the_report(env, monkeypatch):
     df, report = rakuten.load_rakuten(_cfg())
     assert "SECRET-KEY-123" not in str(report.to_dict())
     assert any("ConnectionError" in n for n in report.notes)
+
+
+def test_snapshot_path_follows_live_data_root(monkeypatch, tmp_path):
+    monkeypatch.setattr(rakuten, "resolve_path", lambda p: f"WORKSPACE/{p}")
+    monkeypatch.delenv("DHDE_LIVE_DATA_ROOT", raising=False)
+    assert rakuten.snapshot_path("kanazawa") == "WORKSPACE/rakuten_snapshots/kanazawa.csv"
+    monkeypatch.setenv("DHDE_LIVE_DATA_ROOT", f"{tmp_path}/history/")
+    assert rakuten.snapshot_path("kanazawa") == f"{tmp_path}/history/rakuten_snapshots/kanazawa.csv"
+
+
+def _collector():
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "scripts" / "collect_rakuten.py"
+    spec = importlib.util.spec_from_file_location("collect_rakuten", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_collector_only_fails_the_job_when_every_node_fails(monkeypatch, tmp_path):
+    collector = _collector()
+    monkeypatch.delenv("DHDE_LIVE_DATA_ROOT", raising=False)  # main() sets it; restored after the test
+    configs = {
+        "a": {"node_key": "a", "sources": {"rakuten": {"enabled": True}}},
+        "b": {"node_key": "b", "sources": {"rakuten": {"enabled": True}}},
+        "fukui": {"node_key": "fukui", "sources": {}},  # no rakuten: skipped, not counted
+    }
+    monkeypatch.setattr(collector, "list_configured_nodes", lambda: list(configs))
+    monkeypatch.setattr(collector, "load_node_config", lambda k: configs[k])
+    monkeypatch.setattr(sys, "argv", ["collect_rakuten.py", "--out", str(tmp_path)])
+    ok = rakuten.SourceReport(source="rakuten", node_key="x", status="ok")
+    err = rakuten.SourceReport(source="rakuten", node_key="x", status="error")
+
+    monkeypatch.setattr(collector, "load_rakuten", lambda cfg: (None, err if cfg["node_key"] == "a" else ok))
+    assert collector.main() == 0
+    monkeypatch.setattr(collector, "load_rakuten", lambda cfg: (None, err))
+    assert collector.main() == 1

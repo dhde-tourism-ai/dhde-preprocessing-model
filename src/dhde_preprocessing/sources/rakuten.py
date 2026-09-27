@@ -20,9 +20,11 @@ same measure as Fukui's reservation-repo `hotel` source, which is why
 it's a separate source rather than a replacement.
 
 Rakuten has no history: each run snapshots today + each lead time and
-appends to `{workspace_root}/rakuten_snapshots/{node_key}.csv`, so the
-series only grows from the first run on — this needs to run daily (e.g.
-the same schedule as traffic) to be useful. A lead/day already
+appends to `{live_data_root}/rakuten_snapshots/{node_key}.csv`, so the
+series only grows from the first run on. scripts/collect_rakuten.py runs
+daily in GitHub Actions and commits the snapshots to the `live-data`
+branch; point DHDE_LIVE_DATA_ROOT at a checkout of it to build with them
+(unset, snapshots live under the workspace root). A lead/day already
 snapshotted today is not fetched again.
 """
 from __future__ import annotations
@@ -105,6 +107,15 @@ def count_vacant(geo: dict, stay: date, adult_num: int) -> tuple[int, float | No
     return vacant["pagingInfo"]["recordCount"], _cheapest_charge(vacant["hotels"][0])
 
 
+def snapshot_path(node_key: str) -> str:
+    """Where a node's snapshot log lives: under DHDE_LIVE_DATA_ROOT (the
+    `live-data` branch checkout the daily job writes to) when set, else
+    under the workspace root."""
+    relative = f"{SNAPSHOT_DIR}/{node_key}.csv"
+    live_root = os.environ.get("DHDE_LIVE_DATA_ROOT")
+    return f"{live_root.rstrip('/')}/{relative}" if live_root else resolve_path(relative)
+
+
 def to_daily(snaps: pd.DataFrame, lead_days: list[int]) -> pd.DataFrame:
     """Snapshot log -> one row per stay date, columns per lead time."""
     snaps = snaps.copy()
@@ -131,7 +142,7 @@ def load_rakuten(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     geo = {"latitude": node_cfg["coordinates"]["lat"], "longitude": node_cfg["coordinates"]["lon"],
            "searchRadius": radius, "datumType": 1}
 
-    path = resolve_path(f"{SNAPSHOT_DIR}/{node_key}.csv")
+    path = snapshot_path(node_key)
     snaps = read_csv_if_exists(path)
     if snaps is None:
         snaps = pd.DataFrame(columns=SNAPSHOT_COLS)
