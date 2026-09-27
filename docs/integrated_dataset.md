@@ -37,6 +37,13 @@ Outputs, in `output/`:
 
 ## Columns
 
+The table always has the same 67 columns, in the same order
+(`EXPECTED_COLUMNS` in `integrate.py`), even when a source fails on a run
+or has no data yet. An expected column with no data at all is listed
+under `warnings` in `integrated_fukui_report.json` (today: the `road_*`
+columns). A column a source adds later is left out and named there too,
+until it's added to `EXPECTED_COLUMNS`.
+
 **Row keys and context**
 
 | Column | Meaning |
@@ -47,7 +54,7 @@ Outputs, in `output/`:
 | `is_holiday` | 1 on a Japanese public holiday |
 | `hotel_scope` | Where the hotel columns come from: `station-specific`, `area-specific`, or `regional` (the same echizen-coast feed at Tojinbo, Katsuyama and Eiheiji: identical values, not three observations) |
 | `weather_station` | JMA station used (Eiheiji uses Fukui, ~12km away) |
-| `has_<source>` | 1 if the row has any value from that source (camera, weather, rsi, hotel, traffic, survey, footfall_proxy, visitor_reservation) |
+| `has_<source>` | 1 if the row has any value from that source (camera, weather, rsi, hotel, traffic, road_congestion, survey, footfall_proxy, visitor_reservation) |
 
 **Values** (units and cleaning are described in each source module)
 
@@ -58,6 +65,7 @@ Outputs, in `output/`:
 | `rsi_` | Google Maps / search intent | `rsi_map_views`, `rsi_search_views`, `rsi_directions`, … and `rsi_level` (`area` or `prefecture`) | All (Tojinbo 2026 only, Eiheiji from 2026-06) |
 | `hotel_` | Reservation feeds, cleaned | `hotel_occ`, `hotel_adr`, `hotel_revpar`, `hotel_n_room`, … and flags `hotel_was_imputed`, `hotel_is_stale`, … | All (Rainbow Line from 2025-06) |
 | `traffic_` | JARTIC road counter | `traffic_volume_total`, `traffic_hours_observed` | Fukui Station, Katsuyama, Rainbow Line, Eiheiji (last ~90 days only) |
+| `road_` | TomTom road congestion | `road_congestion` (1 - mean relative speed), `road_relative_speed_mean`, `road_relative_speed_min`, `road_snapshots` | All six, once the collector has history (empty today) |
 | `survey_` | Visitor survey responses | `survey_response_count` | All |
 | `proxy_` | Stand-ins for nodes without a camera | `proxy_camera_count` (Tojinbo's camera, for Awara Onsen), `proxy_survey_count` | Awara Onsen, Eiheiji, Katsuyama |
 | `attraction_` | Dinosaur Museum advance bookings | `attraction_reserved_visitors` (~57% of all visitors) | Katsuyama |
@@ -68,11 +76,18 @@ Outputs, in `output/`:
   count (see `camera.py`); still in each `{node}_master.parquet`.
 - Response-level survey answers (satisfaction, spending, free text): in
   `{node}_survey_responses.parquet`.
-- `road_congestion` (TomTom): no history until the hourly collector has
-  run with `TOMTOM_API_KEY` set; it joins automatically once it has.
+- Values for `road_*` (TomTom): the columns are there but empty until the
+  hourly collector has run with `TOMTOM_API_KEY` set; they fill in
+  automatically once it has.
 
 ## Known limits
 
+- The traffic rule only runs in the integrated tables.
+  `fukui_station_master.parquet` still has the broken counter's 0 days
+  (every day from 2026-08-09), so don't read traffic from the master
+  table directly. It stays out of `traffic.py` because
+  `scripts/collect_live.py` saves that module's output as permanent
+  history.
 - Traffic and road congestion have only a few months of history.
 - Survey counts depend on how many people answered the questionnaire, not
   only on how many visited.

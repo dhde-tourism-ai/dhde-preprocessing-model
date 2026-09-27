@@ -75,6 +75,33 @@ SOURCE_PREFIX = {
     "footfall_proxy": "proxy_",
     "visitor_reservation": "attraction_",
 }
+FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope", "weather_station"]
+
+# The table always has exactly these columns, in this order, so its shape
+# doesn't change when a source fails on one run or starts producing data
+# (road_* stays empty until the TomTom collector has history). An expected
+# column with no data at all is a warning in the report, not a missing column.
+EXPECTED_COLUMNS = FRONT_COLUMNS + [
+    "has_camera", "has_footfall_proxy", "has_hotel", "has_road_congestion", "has_rsi",
+    "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
+    "camera_count", "camera_gate1_vehicle_count", "camera_gate2_vehicle_count",
+    "weather_precip", "weather_temp", "weather_wind", "weather_sun", "weather_humidity", "weather_snow_depth",
+    "rsi_level", "rsi_map_views", "rsi_search_views", "rsi_directions", "rsi_call_clicks", "rsi_website_clicks",
+    "rsi_average_rating", "rsi_review_count_change",
+    "rsi_review_count_by_rating_1", "rsi_review_count_by_rating_2", "rsi_review_count_by_rating_3",
+    "rsi_review_count_by_rating_4", "rsi_review_count_by_rating_5",
+    "hotel_n_room", "hotel_n_people", "hotel_amount_fee", "hotel_n_stay", "hotel_n_reserve", "hotel_capacity",
+    "hotel_occ", "hotel_adr", "hotel_revpar", "hotel_rev_per_guest",
+    "hotel_is_stale", "hotel_from_bad_snapshot", "hotel_was_imputed", "hotel_neg_fee_adjustment",
+    "hotel_n_reserve_reliable",
+    "traffic_volume_total", "traffic_volume_upstream", "traffic_volume_downstream", "traffic_hours_observed",
+    "road_congestion", "road_relative_speed_mean", "road_relative_speed_min", "road_snapshots",
+    "survey_response_count",
+    "proxy_camera_count", "proxy_survey_count",
+    "attraction_reserved_visitors", "attraction_reserved_fee",
+    "attraction_from_earlier_snapshot", "attraction_bookings_final",
+]
+
 SURVEY_COUNT = "survey_response_count"
 RESPONSE_COUNTS = [SURVEY_COUNT, "proxy_survey_count"]
 # Describe a row rather than measure anything, so they don't count towards has_<source>.
@@ -215,7 +242,7 @@ def build_integrated(nodes: list[str], input_dir: str = "output", start: str = D
     train_end = pd.Timestamp(end) if end else jst_yesterday()
     full_end = max(max(m["date"].max() for m, _ in inputs.values()), train_end)
     summary = {"start": str(start_ts.date()), "train_end": str(train_end.date()),
-               "full_end": str(full_end.date()), "nodes": {}}
+               "full_end": str(full_end.date()), "nodes": {}, "warnings": []}
     frames = []
     for node_key, (master, report) in inputs.items():
         rows, notes = integrate_node(master, report, load_node_config(node_key), start_ts, full_end)
@@ -223,17 +250,23 @@ def build_integrated(nodes: list[str], input_dir: str = "output", start: str = D
         summary["nodes"][node_key] = {"notes": notes}
 
     table = pd.concat(frames, ignore_index=True)
-    front = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope", "weather_station"]
-    has = sorted(c for c in table.columns if c.startswith("has_"))
-    table[has] = table[has].fillna(0)  # a node without the source at all
-    table = table[front + has + [c for c in table.columns if c not in front and c not in has]]
+    unexpected = [c for c in table.columns if c not in EXPECTED_COLUMNS]
+    if unexpected:
+        summary["warnings"].append(f"left out, not in EXPECTED_COLUMNS: {', '.join(unexpected)}")
+    table = table.reindex(columns=EXPECTED_COLUMNS)
+    has = [c for c in EXPECTED_COLUMNS if c.startswith("has_")]
+    table[has] = table[has].fillna(0).astype("Int8")  # a node without the source at all
     table, outage_days = blank_camera_outages(table)
     summary["camera_outage_days"] = outage_days
 
     train = table[table["date"] <= train_end].reset_index(drop=True)
+    empty = [c for c in EXPECTED_COLUMNS if c not in FRONT_COLUMNS and not c.startswith("has_")
+             and train[c].isna().all()]
+    if empty:
+        summary["warnings"].append(f"no data in the training table for: {', '.join(empty)}")
     for node_key, rows in train.groupby("node_key"):
         summary["nodes"][node_key]["train_non_null"] = {
-            c: int(rows[c].notna().sum()) for c in train.columns if c not in front}
+            c: int(rows[c].notna().sum()) for c in train.columns if c not in FRONT_COLUMNS}
     summary["full_rows"], summary["train_rows"] = len(table), len(train)
     return table, train, summary
 

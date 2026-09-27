@@ -40,6 +40,8 @@ def main() -> None:
             print(f"  {node_key}: {note}")
     if summary["camera_outage_days"]:
         print(f"  camera system down (all people cameras) on: {', '.join(summary['camera_outage_days'])}")
+    for warning in summary["warnings"]:
+        print(f"  WARNING: {warning}")
     write_integrated(table, train, summary, output_dir=args.output_dir)
 
 

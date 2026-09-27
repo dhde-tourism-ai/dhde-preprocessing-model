@@ -105,3 +105,23 @@ def test_full_table_keeps_future_rows_training_table_stops_at_end(tmp_path, monk
     assert full["date"].max() == pd.Timestamp("2025-01-03") and full["hotel_occ"].notna().sum() == 2
     assert train["date"].max() == pd.Timestamp("2025-01-02") and len(train) == 2
     assert summary["train_end"] == "2025-01-02" and summary["full_end"] == "2025-01-03"
+
+
+def test_table_always_has_the_expected_columns_and_warns_on_empty_ones(tmp_path, monkeypatch):
+    """A source failing on a run (or TomTom history arriving) must not
+    change the table's shape; an expected column with no data is a warning."""
+    import json
+    from dhde_preprocessing import integrate
+
+    master = pd.DataFrame({"date": pd.to_datetime(["2025-01-01"]), "occ": [0.5], "brand_new": [1.0]})
+    master.to_parquet(tmp_path / "tojinbo_master.parquet")
+    (tmp_path / "tojinbo_coverage_report.json").write_text(json.dumps(_report(hotel=["occ", "brand_new"])))
+    monkeypatch.setattr(integrate, "load_node_config", lambda key: _cfg())
+    full, train, summary = integrate.build_integrated(["tojinbo"], input_dir=str(tmp_path),
+                                                      start="2025-01-01", end="2025-01-01")
+    assert list(full.columns) == integrate.EXPECTED_COLUMNS == list(train.columns)
+    assert train.loc[0, "has_road_congestion"] == 0 and train.loc[0, "has_hotel"] == 1
+    warnings = " ".join(summary["warnings"])
+    assert "weather_temp" in warnings and "road_congestion" in warnings
+    assert "hotel_occ" not in warnings.split("no data")[-1]
+    assert "hotel_brand_new" in warnings  # unexpected column is named, not silently dropped
