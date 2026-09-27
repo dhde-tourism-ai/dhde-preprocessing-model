@@ -11,7 +11,7 @@ reviewable instead of living only in coverage reports. Last checked
 |---|---|---|---|---|---|---|
 | Tojinbo | Yes | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No |
 | Fukui Station | Yes | Yes | Partial (prefecture total) | Own feed | Yes | CCTV, 2.7km |
-| Katsuyama | No (proxy) | Yes | Yes | Regional | Yes | Permanent, 5.3km |
+| Katsuyama | No (museum bookings + proxy) | Yes | Yes | Regional | Yes | Permanent, 5.3km |
 | Rainbow Line | Vehicles only | Yes | Yes | Own feed (from 2025-06) | Yes | CCTV, 5km |
 | Awara Onsen | No (proxy) | Yes | Yes | Own feed | Yes | No |
 | Eiheiji | No (proxy) | Partial (12km) | Yes | Regional | Yes | Permanent, 2.5km |
@@ -46,8 +46,13 @@ area-specific reservation feed exists.
   Hotel occupancy (`occ`) is the third proxy signal and already comes from
   the hotel source. A 30km circle was tried but reached Fukui Station (a
   city hub) for Katsuyama and Ono, too different a place to stand in.
-- **Suggested:** any people-flow source for Katsuyama or Ono (e.g. Dinosaur
-  Museum visitor counts) would replace a weak proxy with a real count.
+- **Katsuyama now has a near-direct visitor signal:** Dinosaur Museum
+  advance entry bookings from code4fukui/dinosaur-opendata, daily since
+  2023-09 (`visitor_reservation` source, `reserved_visitors` column).
+  Reserved entries only: ~57% of reported FY2025 visitors (738k of 1.30M),
+  so walk-ins and same-day tickets are missing.
+- **Suggested:** any people-flow source for Ono would replace its
+  survey-only proxy with a real count.
 
 ### Hotel
 - **Area-specific feeds:** Fukui Station (fukui-station-kanko-reservation),
@@ -58,9 +63,12 @@ area-specific reservation feed exists.
 - **Trade-off:** the Mikata Five Lakes feed for Rainbow Line starts
   2025-06-05 (the regional feed starts 2024-12), so Rainbow Line hotel
   history is ~6 months shorter.
-- **Suggested:** code4fukui/dinosaur-opendata for Katsuyama (not yet
-  checked for reservation data); Rakuten data in
-  dhde-tourism-ai/fukui-hotel-data-combined for node-level prices.
+- **Checked, no better hotel source:** every code4fukui reservation repo
+  (only the three area feeds above plus the regional one exist).
+  dinosaur-opendata is museum entry bookings, not hotels (used as visitor
+  data above). The Rakuten file in dhde-tourism-ai/fukui-hotel-data-combined
+  is a one-off price snapshot of 250 hotels for 5 check-in dates (Oct 2026),
+  not a daily series, so it can't give occupancy.
 
 ### RSI (fukui-kanko-trend-data)
 - **Sakai City** (Tojinbo, Mikuni Port, Maruoka) only exists in the 2026
@@ -81,11 +89,15 @@ area-specific reservation feed exists.
   baseline, not a daily signal:
   https://www.mlit.go.jp/road/census/r3/ and
   https://www.pref.fukui.lg.jp/doc/douken/census/r3census.html
-- **Considered, not used:** Google Maps (Routes API). It gives travel time
-  in traffic (congestion), not vehicle counts, has no history, and its
-  terms restrict storing results, which a daily model needs. It is also
-  paid beyond a free monthly allowance. TomTom / HERE flow APIs have free
-  tiers but similar limits (speed, not counts; storage terms to check).
+- **The dashboard needs congestion, not counts.** Two free options:
+  - **TomTom Traffic Flow API (being tested):** current vs free-flow road
+    speed, free tier 2,500 requests/day with no card. Each response has a
+    `confidence` value showing how much is live probe data; the test checks
+    it on the Tojinbo, Awara and Mikuni roads, plus TomTom's storage terms.
+  - **JARTIC volume vs typical volume** at the six nodes with a counter:
+    free and storable.
+- **Not used:** Google Maps (Routes API). Even its free allowance needs a
+  billing account with a card, and its terms restrict storing results.
 
 ### Weather (JMA ETRN)
 - **Eiheiji** uses Fukui station (~12km). The closer Miyama station

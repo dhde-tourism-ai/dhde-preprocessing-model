@@ -23,6 +23,7 @@ from .sources.hotel import load_hotel
 from .sources.rsi import load_rsi
 from .sources.survey import load_survey
 from .sources.traffic import load_traffic
+from .sources.visitor_reservation import load_visitor_reservation
 from .sources.weather import load_weather
 
 SOURCE_LOADERS = {
@@ -32,6 +33,7 @@ SOURCE_LOADERS = {
     "hotel": load_hotel,
     "traffic": load_traffic,
     "footfall_proxy": load_footfall_proxy,  # camera-less nodes only, see module docstring
+    "visitor_reservation": load_visitor_reservation,  # attraction entry bookings, where a feed exists
     # survey is handled separately below — it's response-level, not date-unique
 }
 
