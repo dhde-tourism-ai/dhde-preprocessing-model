@@ -65,6 +65,21 @@ def write_csv(df: "pd.DataFrame", path: str) -> None:
     df.to_csv(path, index=False)
 
 
+def get_live_data_root() -> str:
+    """Where saved history of the live-only sources lives (JARTIC daily
+    rows, TomTom snapshots): the `live-data` branch written by
+    scripts/collect_live.py. Override with DHDE_LIVE_DATA_ROOT (e.g. a
+    checkout of that branch); defaults to the workspace root.
+    """
+    override = os.environ.get("DHDE_LIVE_DATA_ROOT")
+    return override.rstrip("/") if override else get_workspace_root()
+
+
+def resolve_live_path(relative_path: str) -> str:
+    """Like resolve_path, but under get_live_data_root()."""
+    return f"{get_live_data_root()}/{relative_path.lstrip('/')}"
+
+
 def load_node_config(node_key: str, config_dir: Path | str = DEFAULT_CONFIG_DIR) -> dict[str, Any]:
     """Load one node's YAML config (e.g. config/nodes/tojinbo.yaml)."""
     path = Path(config_dir) / "nodes" / f"{node_key}.yaml"

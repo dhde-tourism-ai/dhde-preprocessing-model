@@ -17,11 +17,13 @@ def test_resolve_path_joins_without_mangling_s3_uri(monkeypatch):
     assert resolve_path("some-repo/data.csv") == "s3://my-bucket/dhde/some-repo/data.csv"
 
 
-def test_list_configured_nodes_finds_all_twelve():
+def test_list_configured_nodes_finds_all_fourteen():
+    # Fukui: the six priority nodes (Mikuni Port, Ono and Maruoka dropped for
+    # now, see docs/data_gaps.md). Ishikawa and Toyama: four nodes each.
     nodes = list_configured_nodes()
     assert nodes == [
-        "fukui_station", "himi", "kaga_onsen", "kanazawa", "katsuyama", "komatsu", "nanao",
-        "rainbow_line", "takaoka", "tateyama", "tojinbo", "toyama_station",
+        "awara_onsen", "eiheiji", "fukui_station", "himi", "kaga_onsen", "kanazawa", "katsuyama",
+        "komatsu", "nanao", "rainbow_line", "takaoka", "tateyama", "tojinbo", "toyama_station",
     ]
 
 
@@ -29,8 +31,12 @@ def test_list_configured_nodes_finds_all_twelve():
 def test_every_node_config_loads(node_key):
     cfg = load_node_config(node_key)
     required = {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
-    optional = {"info_desk", "monthly_visitors", "rakuten"}
+    optional = {"info_desk", "monthly_visitors", "rakuten",
+                "footfall_proxy", "visitor_reservation", "road_congestion"}
     assert required <= set(cfg["sources"]) <= required | optional
+    # A proxy only makes sense where the node has no camera of its own.
+    if cfg["sources"].get("footfall_proxy", {}).get("enabled"):
+        assert not cfg["sources"]["camera"].get("enabled")
 
 
 def test_load_node_config_mismatched_key_raises(tmp_path):

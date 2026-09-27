@@ -37,8 +37,11 @@ sources:
 
   hotel:
     enabled: true
-    repo: echizen-coast-kanko-reservation
-    scope: regional
+    # Mikata Five Lakes area feed (3 hotels, from 2025-06), right next to
+    # the Rainbow Line — replaces the regional echizen-coast feed per tech
+    # lead review of PR #6.
+    repo: mikatagoko-kanko-reservation
+    scope: area-specific
 
   survey:
     enabled: true
@@ -55,3 +58,7 @@ sources:
       has zero coverage in this whole region). NOT confirmed to sit on
       the actual toll road access route; verify before treating this as a
       precise local signal.
+
+  road_congestion:
+    enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
+    radius_km: 2
