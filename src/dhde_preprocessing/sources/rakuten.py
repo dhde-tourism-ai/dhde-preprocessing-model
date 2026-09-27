@@ -68,19 +68,24 @@ def _cheapest_charge(hotel: list[dict]) -> float | None:
     return float(min(charges)) if charges else None
 
 
-def snapshot(geo: dict, stay: date, adult_num: int) -> tuple[int, int, float | None]:
-    """(hotels listed in radius, hotels with a room for `stay`, cheapest charge)."""
+def count_listed(geo: dict) -> int:
+    """Hotels on Rakuten within the search radius — asked once per run,
+    since it doesn't depend on the stay date."""
     listed = _get("SimpleHotelSearch/20170426", {**geo, "hits": 1})
     time.sleep(REQUEST_GAP_S)
+    return listed["pagingInfo"]["recordCount"] if listed else 0
+
+
+def count_vacant(geo: dict, stay: date, adult_num: int) -> tuple[int, float | None]:
+    """(hotels with a room for `stay`, cheapest charge for that night)."""
     vacant = _get("VacantHotelSearch/20170426", {
         **geo, "checkinDate": stay.isoformat(), "checkoutDate": (stay + timedelta(days=1)).isoformat(),
         "adultNum": adult_num, "hits": 1, "sort": "+roomCharge",
     })
     time.sleep(REQUEST_GAP_S)
-    n_listed = listed["pagingInfo"]["recordCount"] if listed else 0
     if not vacant:
-        return n_listed, 0, None
-    return n_listed, vacant["pagingInfo"]["recordCount"], _cheapest_charge(vacant["hotels"][0])
+        return 0, None
+    return vacant["pagingInfo"]["recordCount"], _cheapest_charge(vacant["hotels"][0])
 
 
 def to_daily(snaps: pd.DataFrame, lead_days: list[int]) -> pd.DataFrame:
@@ -115,12 +120,17 @@ def load_rakuten(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     done_today = set(snaps.loc[snaps["snapshot_date"] == today.isoformat(), "lead_days"].astype(int))
 
     notes, new_rows = [], []
-    for lead in lead_days:
-        if lead in done_today:
-            continue
+    todo = [lead for lead in lead_days if lead not in done_today]
+    listed = None
+    if todo:
+        try:
+            listed = count_listed(geo)
+        except Exception as e:  # noqa: BLE001 - without the hotel count there's no share to compute
+            notes.append(f"hotel count failed this run, no snapshots taken: {e!r}")
+    for lead in todo if listed is not None else []:
         stay = today + timedelta(days=lead)
         try:
-            listed, vacant, charge = snapshot(geo, stay, r_cfg.get("adult_num", 2))
+            vacant, charge = count_vacant(geo, stay, r_cfg.get("adult_num", 2))
         except Exception as e:  # noqa: BLE001 - one failed lead shouldn't lose the others
             notes.append(f"lead {lead}d snapshot failed this run: {e!r}")
             continue

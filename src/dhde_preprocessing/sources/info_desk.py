@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ..validation import SourceReport, unavailable_report, validate_daily
+from ..validation import SourceReport, blank_zero_days, unavailable_report, validate_daily
 from .remote_csv import fetch_sheet
 
 CATEGORY_COLUMNS = {"合計": "info_desk_total", "外国人": "info_desk_foreign"}
@@ -40,10 +40,8 @@ def clean_desk(raw: pd.DataFrame) -> tuple[pd.DataFrame, int]:
             .pivot_table(index="date", columns="属性", values="count", aggfunc="sum")
             .rename(columns=CATEGORY_COLUMNS)
             .reindex(columns=list(CATEGORY_COLUMNS.values())))
-    zero = wide["info_desk_total"] == 0
-    wide.loc[zero, :] = float("nan")
     wide.columns.name = None
-    return wide.reset_index(), int(zero.sum())
+    return blank_zero_days(wide.reset_index(), "info_desk_total", list(CATEGORY_COLUMNS.values()))
 
 
 def load_info_desk(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:

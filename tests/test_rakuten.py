@@ -20,12 +20,17 @@ def _cfg(leads=(1, 7)):
 
 
 def test_snapshots_are_logged_and_pivoted_by_lead(env, monkeypatch):
-    calls = []
+    calls = {"listed": 0, "vacant": []}
 
-    def _snapshot(geo, stay, adult_num):
-        calls.append(stay)
-        return 200, (150 if stay == date.today() + timedelta(days=1) else 180), 8000.0
-    monkeypatch.setattr(rakuten, "snapshot", _snapshot)
+    def _listed(geo):
+        calls["listed"] += 1
+        return 200
+
+    def _vacant(geo, stay, adult_num):
+        calls["vacant"].append(stay)
+        return (150 if stay == date.today() + timedelta(days=1) else 180), 8000.0
+    monkeypatch.setattr(rakuten, "count_listed", _listed)
+    monkeypatch.setattr(rakuten, "count_vacant", _vacant)
 
     df, report = rakuten.load_rakuten(_cfg())
     assert report.status == "ok"
@@ -35,9 +40,25 @@ def test_snapshots_are_logged_and_pivoted_by_lead(env, monkeypatch):
     assert df.loc[df["date"] == tomorrow, "rakuten_vacant_share_d1"].item() == 0.75
     assert (env / "rakuten_snapshots" / "kanazawa.csv").exists()
 
-    # A second run the same day doesn't re-fetch.
+    # The hotel count is asked once per run, not once per lead time.
+    assert calls["listed"] == 1
+    assert len(calls["vacant"]) == 2
+
+    # A second run the same day doesn't re-fetch anything.
     rakuten.load_rakuten(_cfg())
-    assert len(calls) == 2
+    assert calls["listed"] == 1
+    assert len(calls["vacant"]) == 2
+
+
+def test_failed_hotel_count_takes_no_snapshots(env, monkeypatch):
+    def _raise(geo):
+        raise RuntimeError("503")
+    monkeypatch.setattr(rakuten, "count_listed", _raise)
+    monkeypatch.setattr(rakuten, "count_vacant", lambda *a: pytest.fail("must not query vacancies"))
+    df, report = rakuten.load_rakuten(_cfg())
+    assert df is None
+    assert report.status == "error"
+    assert any("hotel count failed" in n for n in report.notes)
 
 
 def test_missing_credentials_is_an_error_not_a_crash(monkeypatch):
@@ -49,11 +70,12 @@ def test_missing_credentials_is_an_error_not_a_crash(monkeypatch):
 
 
 def test_one_failed_lead_keeps_the_other(env, monkeypatch):
-    def _snapshot(geo, stay, adult_num):
+    def _vacant(geo, stay, adult_num):
         if stay == date.today() + timedelta(days=7):
             raise RuntimeError("429")
-        return 100, 40, None
-    monkeypatch.setattr(rakuten, "snapshot", _snapshot)
+        return 40, None
+    monkeypatch.setattr(rakuten, "count_listed", lambda geo: 100)
+    monkeypatch.setattr(rakuten, "count_vacant", _vacant)
     df, report = rakuten.load_rakuten(_cfg())
     assert report.status == "ok"
     assert df["rakuten_vacant_share_d1"].dropna().tolist() == [0.4]

@@ -27,7 +27,7 @@ from datetime import date
 
 import pandas as pd
 
-from ..validation import SourceReport, validate_daily
+from ..validation import SourceReport, blank_zero_days, validate_daily
 from .remote_csv import fetch_csv
 
 EXPORT_URL = "https://toyama-ai.com/toyama_aicamera/db/"
@@ -40,9 +40,7 @@ def clean_camera(raw: pd.DataFrame, prefix: str) -> tuple[pd.DataFrame, int]:
     for src, dst in COLUMNS.items():
         df[f"{prefix}{dst}"] = pd.to_numeric(raw[src], errors="coerce")
     df = df.dropna(subset=["date"])
-    zero = df[f"{prefix}count"] == 0
-    df.loc[zero, [f"{prefix}{c}" for c in COLUMNS.values()]] = float("nan")
-    return df, int(zero.sum())
+    return blank_zero_days(df, f"{prefix}count", [f"{prefix}{c}" for c in COLUMNS.values()])
 
 
 def load_toyama_camera(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
