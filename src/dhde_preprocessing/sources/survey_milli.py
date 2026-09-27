@@ -61,7 +61,7 @@ def assign_city(responses: pd.DataFrame, facilities: pd.DataFrame) -> pd.Series:
     area = _area(responses["回答エリア"])
     name = responses["施設"].astype(str).str.strip()
     city = pd.Series([by_area_and_name.get(k) for k in zip(area, name)], index=responses.index)
-    return city.combine_first(name.map(by_name))
+    return city.where(city.notna(), name.map(by_name))
 
 
 def clean_responses(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
