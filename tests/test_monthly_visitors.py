@@ -96,3 +96,10 @@ def test_disabled_is_unavailable():
     df, report = monthly_visitors.load_monthly_visitors({"node_key": "x", "sources": {}})
     assert df is None
     assert report.status == "unavailable"
+
+
+def test_revised_prefecture_gets_a_comparability_note(official):
+    _, fukui = monthly_visitors.load_monthly_visitors(_cfg(city=17201, pref=18))
+    _, ishikawa = monthly_visitors.load_monthly_visitors(_cfg())
+    assert any("202501 onward is comparable" in n for n in fukui.notes)
+    assert not any("comparable" in n for n in ishikawa.notes)

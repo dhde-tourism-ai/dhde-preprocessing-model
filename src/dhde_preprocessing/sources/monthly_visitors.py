@@ -17,6 +17,13 @@ and revised ones from 2026-03 — a fake 2-6x jump for many Fukui towns
 (Fukui city Feb 2026: 57,569 in the mirror, 186,829 revised). Reading
 the publisher's files every run picks up any future revision too.
 
+The revision did not reach back past 2025, so even the publisher's own
+series breaks between 2024-12 and 2025-01 wherever a prefecture changed
+its points a lot: city medians 2025/2024 are 1.65x for Fukui, against
+1.09x nationally (Ishikawa 1.08x, Toyama 1.09x). For those prefectures
+(REVISED_FROM) only 2025-01 onward is comparable month to month; the
+report says so, and the monthly forecast uses nothing earlier.
+
 The master table is daily, so each month's figure is repeated on every
 day of that month in columns named `*_visitors_month` — the value is the
 MONTH's total, not that day's. Dividing it into days (or not) is a
@@ -41,6 +48,11 @@ OFFICIAL_PAGE = "https://www.nihon-kankou.or.jp/home/jigyou/research/d-toukei/"
 # e.g. https://d2eveo6c5xeu3l.cloudfront.net/city/city2025.csv, .../pref/pref202608.csv
 CSV_LINK_RE = re.compile(r'href="(https://[^"]+/(?:city|pref)/((?:city|pref)\d{4}(?:\d{2})?)\.csv)"')
 FILE_LIST_CACHE = f"{CACHE_DIR}/kanko_stat_files.csv"
+
+# pref lgcode -> first month (YYYYMM) comparable with the months after it.
+# Found by city-median 2025/2024 ratios above 1.3x: Fukui 1.65x, Ehime and
+# Kochi similar, every other prefecture near the national 1.09x.
+REVISED_FROM = {18: 202501, 38: 202501, 39: 202501}
 
 
 def list_official_csvs() -> tuple[list[tuple[str, str]], str]:
@@ -126,6 +138,10 @@ def load_monthly_visitors(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRe
     daily = frames[0]
     for f in frames[1:]:
         daily = pd.merge(daily, f, on="date", how="outer")
+    revised_from = REVISED_FROM.get(int(m_cfg["pref_lgcode"]))
+    if revised_from:
+        notes.append(f"only {revised_from} onward is comparable: the 2026-04 tourism-point revision "
+                     "did not reach back, so earlier months count fewer points")
     notes.append("monthly totals repeated on every day of their month — not daily counts")
     report = validate_daily(daily, source="monthly_visitors", node_key=node_key, notes=notes)
     return daily, report
