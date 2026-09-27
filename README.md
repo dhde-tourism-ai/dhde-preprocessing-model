@@ -149,46 +149,60 @@ it isn't naturally one-row-per-day).
   label crashes with `UnicodeEncodeError` on a default Windows terminal
   (cp1252).
 
-## Ishikawa nodes
+## Ishikawa and Toyama nodes
 
-`kanazawa`, `kaga_onsen`, `komatsu` and `nanao` are Ishikawa nodes. They
-use the same pipeline, but every code4fukui dataset is Fukui-only, so
-each gets only what really exists for Ishikawa — never Fukui data as a
-stand-in:
+Ishikawa: `kanazawa`, `kaga_onsen`, `komatsu`, `nanao`. Toyama:
+`toyama_station`, `takaoka`, `himi`, `tateyama`. Same pipeline, but
+code4fukui's camera, RSI and hotel datasets are Fukui-only, so each node
+gets only what really exists for its own prefecture — never another
+prefecture's data as a stand-in:
 
-| Source | Ishikawa | From |
+| Source | Ishikawa | Toyama |
 |---|---|---|
-| weather | all four | JMA, `prec_no: "56"` |
-| traffic | kanazawa (~1.2km), komatsu (~5.7km) | JARTIC; kaga_onsen and nanao disabled, nearest points ~6.6km / ~7.0km |
-| survey | all four | Milli QR survey (`provider: milli`), matched on facility 市町 |
-| info_desk | kanazawa only | Milli's 金沢駅 and 金沢中央 tourist desk enquiry counts |
-| camera, rsi, hotel | none | disabled with a reason in each config |
+| weather | all four (JMA `prec_no: "56"`) | all four (JMA `prec_no: "55"`) |
+| traffic | kanazawa ~1.2km, komatsu ~5.7km; kaga_onsen/nanao off (~6.6/~7.0km) | toyama_station ~2.3km, takaoka ~1.6km, himi ~1.0km; tateyama off (~19km) |
+| survey | Milli QR survey (`provider: milli`), from 2023-09 | TOYTOS web survey (`provider: toytos`), from 2025-04 |
+| camera | none | toyama_station only — Toyama City AI cameras (`provider: toyama_city`), from 2023-02 |
+| info_desk | kanazawa only — Kanazawa tourist desk enquiries | none |
+| monthly_visitors | all four | all four |
+| rsi, hotel | none | none |
 
-- **Milli** ([site](https://sites.google.com/view/milli-ishikawa-pref/)) is
-  Ishikawa Prefecture's tourism open-data project. It publishes public
-  Google Sheets, not a git repo, so `sources/gsheet.py` pulls each
-  sheet's CSV export every run and caches it under
-  `{workspace_root}/milli_cache/`, falling back to the cache if the
-  fetch fails.
-- **Survey responses carry a facility name, not a municipality.** The
-  municipality comes from Milli's separate facility list, joined on
-  (エリア, 施設). ~1% of responses name a facility missing from that list
-  and are dropped (counted in the report notes).
-- **Cleaning:** survey double submissions (same facility, same second)
-  are dropped, keeping the first, along with the always-"同意する"
-  consent column. A tourist desk day with a total of 0 is treated as
-  missing (the one case is 2024-01-02, the day after the Noto
-  earthquake), and a day only gets a desk total when every desk has a
-  value. Spending answers stay as the questionnaire's yen-range text.
-- **Milli survey counts are not comparable with Fukui's.** They depend
-  on how many QR posters each prefecture put up. Compare trends within
-  Ishikawa, not levels across prefectures.
-- **`info_desk` is an optional source.** `join.py` skips it for nodes
-  whose config doesn't declare it, so Fukui coverage reports are
-  unchanged. Its sheets lag a month or two behind.
-- **`nanao` has large survey gaps** (576 empty days since 2023-09) —
-  most likely because Wakura Onsen closed after the January 2024 Noto
-  earthquake. Real, not a pipeline bug.
+**`monthly_visitors` is the cross-prefecture comparison signal.** It
+comes from code4fukui/japan-kanko-stat (JTA digital tourism statistics):
+monthly visitor counts per city and prefecture, measured the same way
+across Japan, from 2021-01. Each month's total is repeated on every day
+of that month (`city_visitors_month`, `pref_visitors_month`). Fukui
+nodes can opt in with the same 5 config lines (Fukui pref lgcode 18,
+e.g. Fukui city 18201, Sakai 18210). Survey counts are **not** comparable
+across prefectures — each prefecture runs its own questionnaire and
+poster placement — so compare survey trends within a prefecture only.
+
+- **Where the data comes from.** Sibling repos, like the Fukui sources:
+  `ishikawa-kanko-survey` and `japan-kanko-stat` (both code4fukui). Over
+  HTTP, via `sources/remote_csv.py` (cached under
+  `{workspace_root}/open_data_cache/`, falls back to the cache if a
+  fetch fails): Milli's facility list and tourist desk Google Sheets,
+  TOYTOS from Toyama's CKAN portal, Toyama City's camera CSV export.
+- **Milli survey rows carry a facility, not a municipality.** The
+  municipality comes from Milli's facility list, joined on (area,
+  facility); ~1% name a facility missing from the list and are dropped
+  (counted in the report notes). TOYTOS rows already carry the
+  municipality they were answered in (回答場所).
+- **Cleaning:** Milli double submissions (same facility, same second)
+  are dropped, keeping the first; TOYTOS has dates only, so only exact
+  duplicate rows are dropped. A day with a total of 0 at a tourist desk
+  or a station camera is treated as missing (closed / camera down), not
+  0. A day only gets a desk total when every desk has a value. Toyama
+  cameras are kept as separate columns per camera, never summed (one
+  person can pass both). Spending answers stay as yen-range text.
+- **Optional sources.** `info_desk` and `monthly_visitors` are skipped
+  for nodes whose config doesn't declare them, so Fukui output is
+  unchanged.
+- **Real gaps, not pipeline bugs:** `nanao` has 576 survey-free days
+  since 2023-09 (most likely Wakura Onsen closing after the January 2024
+  Noto earthquake); both Toyama Station cameras have no data
+  2023-11-22 → 2023-12-19; the Kanazawa desk's one zero day is
+  2024-01-02, the day after the earthquake.
 
 ## Why survey is handled differently from the other five sources
 

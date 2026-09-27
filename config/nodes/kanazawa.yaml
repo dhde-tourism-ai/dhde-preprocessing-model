@@ -5,9 +5,10 @@ coordinates:
   lon: 136.6625  # Kenroku-en — distinct from kanazawa_spillover, which models Kanazawa as a Fukui-bound origin
 
 sources:
-  # Ishikawa node. Every code4fukui dataset is Fukui-only, so camera, RSI
-  # and hotel are disabled rather than filled with Fukui data. Survey and
-  # (Kanazawa only) info_desk come from Milli, Ishikawa's tourism open data.
+  # Ishikawa node. code4fukui's camera, RSI and hotel datasets are
+  # Fukui-only, so those are disabled rather than filled with Fukui data.
+  # Survey and (Kanazawa only) info_desk come from Milli, Ishikawa's
+  # tourism open data.
   camera:
     enabled: false
     reason: >
@@ -37,8 +38,8 @@ sources:
 
   survey:
     enabled: true
-    provider: milli  # Ishikawa's QR survey, not fukui-kanko-survey — see sources/survey_milli.py
-    sheet_id: "1riK_ufkmF6Ql7Tujwlm22FtHOLz7hwUzf6Zi6JAG_QI"  # QRアンケート 表形式データ (全エリア)
+    provider: milli  # Ishikawa's QR survey (Milli), not fukui-kanko-survey — see sources/survey_milli.py
+    repo: ishikawa-kanko-survey  # code4fukui, pulls Milli daily
     facilities_sheet_id: "1IwKFT7ZiNYK4RStuF-1vN3EDf4_L9ohhbC7aeawk10s"  # facility list with 市町
     cities: ["金沢市"]
 
@@ -58,3 +59,9 @@ sources:
         sheet_id: "1i4cCSjZWu9zwAOIHHv3ejEimL-eP_G_D62cMPPowWjA"
       - name: 金沢中央観光案内所
         sheet_id: "1rgj-IGrCRETkV72Ve0ztFsIeYniy1rAZXzOxCyqFuoE"
+
+  monthly_visitors:
+    enabled: true
+    repo: japan-kanko-stat
+    city_lgcode: 17201
+    pref_lgcode: 17

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from dhde_preprocessing.sources import gsheet, info_desk
+from dhde_preprocessing.sources import info_desk, remote_csv
 
 
 def _desk(totals, foreign):
@@ -48,32 +48,32 @@ def test_missing_config_is_unavailable():
 
 @pytest.fixture
 def patch_resolve_path(monkeypatch, tmp_path):
-    monkeypatch.setattr(gsheet, "resolve_path", lambda p: str(tmp_path / p))
+    monkeypatch.setattr(remote_csv, "resolve_path", lambda p: str(tmp_path / p))
     return tmp_path
 
 
-def test_gsheet_falls_back_to_cache_when_fetch_fails(monkeypatch, patch_resolve_path):
-    cache = patch_resolve_path / gsheet.CACHE_DIR / "x.csv"
+def test_remote_csv_falls_back_to_cache_when_fetch_fails(monkeypatch, patch_resolve_path):
+    cache = patch_resolve_path / remote_csv.CACHE_DIR / "x.csv"
     cache.parent.mkdir(parents=True)
     pd.DataFrame({"a": [1, 2]}).to_csv(cache, index=False)
 
     def _raise(*a, **k):
-        raise gsheet.requests.ConnectionError("offline")
-    monkeypatch.setattr(gsheet.requests, "get", _raise)
-    df, note = gsheet.fetch_sheet("sheet", "x")
+        raise remote_csv.requests.ConnectionError("offline")
+    monkeypatch.setattr(remote_csv.requests, "get", _raise)
+    df, note = remote_csv.fetch_sheet("sheet", "x")
     assert df["a"].tolist() == [1, 2]
     assert "cached copy" in note
 
 
-def test_gsheet_rejects_non_csv_response(monkeypatch, patch_resolve_path):
+def test_remote_csv_rejects_non_csv_response(monkeypatch, patch_resolve_path):
     class _Resp:
         headers = {"Content-Type": "text/html; charset=utf-8"}
         content = b"<html>sign in</html>"
         def raise_for_status(self):
             pass
-    monkeypatch.setattr(gsheet.requests, "get", lambda *a, **k: _Resp())
+    monkeypatch.setattr(remote_csv.requests, "get", lambda *a, **k: _Resp())
     with pytest.raises(ValueError):
-        gsheet.fetch_sheet("sheet", "y")
+        remote_csv.fetch_sheet("sheet", "y")
 
 
 def test_zero_total_day_becomes_missing_not_zero(monkeypatch):

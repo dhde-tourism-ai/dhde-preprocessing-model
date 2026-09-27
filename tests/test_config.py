@@ -13,11 +13,11 @@ def test_resolve_path_joins_without_mangling_s3_uri(monkeypatch):
     assert resolve_path("some-repo/data.csv") == "s3://my-bucket/dhde/some-repo/data.csv"
 
 
-def test_list_configured_nodes_finds_all_eight():
+def test_list_configured_nodes_finds_all_twelve():
     nodes = list_configured_nodes()
     assert nodes == [
-        "fukui_station", "kaga_onsen", "kanazawa", "katsuyama", "komatsu", "nanao",
-        "rainbow_line", "tojinbo",
+        "fukui_station", "himi", "kaga_onsen", "kanazawa", "katsuyama", "komatsu", "nanao",
+        "rainbow_line", "takaoka", "tateyama", "tojinbo", "toyama_station",
     ]
 
 
@@ -25,7 +25,7 @@ def test_list_configured_nodes_finds_all_eight():
 def test_every_node_config_loads(node_key):
     cfg = load_node_config(node_key)
     required = {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
-    optional = {"info_desk"}
+    optional = {"info_desk", "monthly_visitors"}
     assert required <= set(cfg["sources"]) <= required | optional
 
 

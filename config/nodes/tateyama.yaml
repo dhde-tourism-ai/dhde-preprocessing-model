@@ -1,0 +1,55 @@
+node_key: tateyama
+label: "Tateyama (立山)"
+coordinates:
+  lat: 36.5836
+  lon: 137.4411  # Tateyama Station — Tateyama Kurobe Alpine Route entrance
+
+sources:
+  # Toyama node. code4fukui's RSI and hotel datasets are Fukui-only, so
+  # those are disabled rather than filled with Fukui data. Survey comes
+  # from TOYTOS, Toyama's tourism web survey.
+  camera:
+    enabled: false
+    reason: >
+      Toyama City's AI cameras cover central Toyama only; no public
+      people-counting camera data was found for Tateyama (checked 2026-09-27).
+
+  rsi:
+    enabled: false
+    reason: >
+      fukui-kanko-trend-data tracks Fukui municipalities only. No Toyama
+      equivalent of its Google Business Profile metrics was found.
+
+  hotel:
+    enabled: false
+    reason: >
+      The code4fukui reservation repos cover Fukui areas only. No daily
+      Toyama reservation feed was found.
+
+  weather:
+    enabled: true
+    station_name: "上市 (Kamiichi)"
+    prec_no: "55"  # Toyama
+    block_no: "0553"  # ~9.7km; the nearer 立山芦峅 (~5.1km) records precipitation only
+    page: hourly_a1
+    start_date: "2024-12-01"
+
+  survey:
+    enabled: true
+    provider: toytos  # Toyama's tourism web survey — see sources/survey_toytos.py
+    ckan_dataset: kanko_data
+    resource_name: "富山県観光ウェブアンケート"
+    fallback_url: "https://toyama-pref.box.com/shared/static/6tpwiv96wzngxsk3rio1t1vi1dhordnn.csv"
+    cities: ["立山町"]
+
+  traffic:
+    enabled: false
+    reason: >
+      Nearest CCTV AI-counter point is ~19.3km away (4810420). Queried live
+      2026-09-27.
+
+  monthly_visitors:
+    enabled: true
+    repo: japan-kanko-stat
+    city_lgcode: 16323
+    pref_lgcode: 16

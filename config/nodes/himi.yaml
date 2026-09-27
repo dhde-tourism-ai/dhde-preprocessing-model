@@ -1,0 +1,57 @@
+node_key: himi
+label: "Himi (氷見)"
+coordinates:
+  lat: 36.8566
+  lon: 136.9866  # Himi fishing port / Himi Banya-gai
+
+sources:
+  # Toyama node. code4fukui's RSI and hotel datasets are Fukui-only, so
+  # those are disabled rather than filled with Fukui data. Survey comes
+  # from TOYTOS, Toyama's tourism web survey.
+  camera:
+    enabled: false
+    reason: >
+      Toyama City's AI cameras cover central Toyama only; no public
+      people-counting camera data was found for Himi (checked 2026-09-27).
+
+  rsi:
+    enabled: false
+    reason: >
+      fukui-kanko-trend-data tracks Fukui municipalities only. No Toyama
+      equivalent of its Google Business Profile metrics was found.
+
+  hotel:
+    enabled: false
+    reason: >
+      The code4fukui reservation repos cover Fukui areas only. No daily
+      Toyama reservation feed was found.
+
+  weather:
+    enabled: true
+    station_name: "氷見 (Himi)"
+    prec_no: "55"  # Toyama
+    block_no: "1309"  # nearest JMA station, ~3.9km
+    page: hourly_a1
+    start_date: "2024-12-01"
+
+  survey:
+    enabled: true
+    provider: toytos  # Toyama's tourism web survey — see sources/survey_toytos.py
+    ckan_dataset: kanko_data
+    resource_name: "富山県観光ウェブアンケート"
+    fallback_url: "https://toyama-pref.box.com/shared/static/6tpwiv96wzngxsk3rio1t1vi1dhordnn.csv"
+    cities: ["氷見市"]
+
+  traffic:
+    enabled: true
+    point_code: 4810510
+    distance_km: 1.0
+    reason: >
+      Included but flagged — CCTV counter ~1.0km from Himi port, queried live
+      2026-09-27. Not confirmed to be the road visitors use.
+
+  monthly_visitors:
+    enabled: true
+    repo: japan-kanko-stat
+    city_lgcode: 16205
+    pref_lgcode: 16

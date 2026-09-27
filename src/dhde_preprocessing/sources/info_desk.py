@@ -17,7 +17,7 @@ from __future__ import annotations
 import pandas as pd
 
 from ..validation import SourceReport, unavailable_report, validate_daily
-from .gsheet import fetch_sheet
+from .remote_csv import fetch_sheet
 
 CATEGORY_COLUMNS = {"合計": "info_desk_total", "外国人": "info_desk_foreign"}
 
