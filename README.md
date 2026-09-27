@@ -55,6 +55,18 @@ type later, follow that same signature and register it in
 `join.py`'s `SOURCE_LOADERS` (or handle it separately like `survey`, if
 it isn't naturally one-row-per-day).
 
+## Collecting live data (history can't be backfilled)
+
+JARTIC keeps hourly traffic for only ~3 months and TomTom only gives the
+current state, so their history exists only if we save it.
+`scripts/collect_live.py` pulls both for every node, and
+`.github/workflows/collect-live-data.yml` runs it hourly (06:15 to 21:15 JST)
+and commits the results to the `live-data` branch, keeping main free of data
+commits. It needs the `TOMTOM_API_KEY` repository secret (Settings → Secrets
+and variables → Actions); without it only JARTIC is collected. Scheduled
+workflows only run from the default branch, so collection starts once this is
+merged to main.
+
 ## Non-obvious things found while building this — read before extending
 
 - **`config.resolve_path`** is the only way any source module touches the
