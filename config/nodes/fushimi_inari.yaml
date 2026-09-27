@@ -59,7 +59,7 @@ sources:
   monthly_visitors:
     enabled: true
     repo: japan-kanko-stat
-    city_lgcode: 26109  # 伏見区; japan-kanko-stat has wards, not the whole city
+    city_lgcode: 26109  # 伏見区; the statistics have wards, not the whole city
     pref_lgcode: 26
 
   rakuten:

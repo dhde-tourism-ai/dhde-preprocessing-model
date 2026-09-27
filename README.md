@@ -285,7 +285,7 @@ that really exists for the prefecture, never another prefecture's.
 |---|---|
 | weather | all eight: 京都 (`prec_no: "61"`, block 47759) and 大阪 (`"62"`, 47772), the nearest full-observation stations (1–8km) |
 | traffic | six, 0.5–5.3km, each node on its own point (see below); namba and osaka_castle off (their nearest counters read 0 on 84–87 of the last 91 days) |
-| monthly_visitors | all eight, by ward (japan-kanko-stat has wards, not the whole cities) |
+| monthly_visitors | all eight, by ward (the statistics have wards, not the whole cities) |
 | rakuten | all eight, 1km radius |
 | camera, rsi, hotel, survey | none: no open equivalent found, see [`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md) |
 

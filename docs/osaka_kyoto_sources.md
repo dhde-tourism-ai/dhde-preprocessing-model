@@ -127,7 +127,7 @@ code:
 |---|---|
 | `weather` (JMA ETRN) | Any JMA station |
 | `traffic` (JARTIC API) | Any JARTIC point, national roads only |
-| `monthly_visitors` (japan-kanko-stat) | Osaka (lgcode 27) and Kyoto (26) prefectures and their cities and wards, monthly, 2021-01 to 2026-08 (e.g. Osaka Kita-ku 27127, Kyoto Nakagyo-ku 26104) |
+| `monthly_visitors` (JTA digital tourism statistics) | Osaka (lgcode 27) and Kyoto (26) prefectures and their cities and wards, monthly, 2021-01 to 2026-08 (e.g. Osaka Kita-ku 27127, Kyoto Nakagyo-ku 26104) |
 | `rakuten` (Rakuten Travel API) | Any coordinates; history only builds from the first daily run |
 
 ## Still missing for Osaka and Kyoto

@@ -56,7 +56,7 @@ sources:
   monthly_visitors:
     enabled: true
     repo: japan-kanko-stat
-    city_lgcode: 27127  # 北区; japan-kanko-stat has wards, not the whole city
+    city_lgcode: 27127  # 北区; the statistics have wards, not the whole city
     pref_lgcode: 27
 
   rakuten:
