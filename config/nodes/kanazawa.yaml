@@ -2,7 +2,7 @@ node_key: kanazawa
 label: "Kanazawa (金沢)"
 coordinates:
   lat: 36.5621
-  lon: 136.6625  # Kenroku-en — distinct from kanazawa_spillover, which models Kanazawa as a Fukui-bound origin
+  lon: 136.6625  # Kenroku-en
 
 sources:
   # Ishikawa node. code4fukui's camera, RSI and hotel datasets are
