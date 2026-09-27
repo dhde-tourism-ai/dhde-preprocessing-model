@@ -49,3 +49,7 @@ sources:
       (queried live 2026-09-27; nearest CCTV counter is ~10.4km). NOT
       confirmed to sit on the road visitors use to reach Eiheiji; verify
       before treating this as a precise local signal.
+
+  footfall_proxy:
+    enabled: true  # no camera here: nearest camera + pooled nearby survey volume
+    radii_km: [5, 15]  # 30km would reach Fukui Station, a city hub: too different to stand in

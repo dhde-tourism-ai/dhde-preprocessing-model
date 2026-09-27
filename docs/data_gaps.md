@@ -11,13 +11,13 @@ reviewable instead of living only in coverage reports. Last checked
 |---|---|---|---|---|---|---|
 | Tojinbo | Yes | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No |
 | Fukui Station | Yes | Yes | Partial (prefecture total) | Own feed | Yes | CCTV, 2.7km |
-| Katsuyama | No | Yes | Yes | Regional | Yes | Permanent, 5.3km |
+| Katsuyama | No (proxy) | Yes | Yes | Regional | Yes | Permanent, 5.3km |
 | Rainbow Line | Vehicles only | Yes | Yes | Own feed (from 2025-06) | Yes | CCTV, 5km |
-| Awara Onsen | No | Yes | Yes | Own feed | Yes | No |
-| Eiheiji | No | Partial (12km) | Yes | Regional | Yes | Permanent, 2.5km |
-| Mikuni Port | No | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No |
-| Ono Castle Town | No | Yes | Yes | Regional | Yes | Permanent, 3.9km |
-| Maruoka Castle | No | Partial (no humidity/sun) | Partial (Sakai City 2026 only) | Regional | Yes | CCTV, 1.3km |
+| Awara Onsen | No (proxy) | Yes | Yes | Own feed | Yes | No |
+| Eiheiji | No (proxy) | Partial (12km) | Yes | Regional | Yes | Permanent, 2.5km |
+| Mikuni Port | No (proxy) | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No |
+| Ono Castle Town | No (proxy) | Yes | Yes | Regional | Yes | Permanent, 3.9km |
+| Maruoka Castle | No (proxy) | Partial (no humidity/sun) | Partial (Sakai City 2026 only) | Regional | Yes | CCTV, 1.3km |
 
 "Regional" = code4fukui/echizen-coast-kanko-reservation, used where no
 area-specific reservation feed exists.
@@ -29,12 +29,25 @@ area-specific reservation feed exists.
   Town, Maruoka Castle. code4fukui/fukui-kanko-people-flow-data only has
   sensors at Tojinbo, Fukui Station and the two Rainbow Line parking gates.
 - **Rainbow Line** gates count vehicles (LicensePlate.csv), not people.
-- **Today:** camera is `enabled: false` and reported as unavailable.
-  Nothing is estimated.
-- **Planned:** a footfall proxy from nearby signals (hotel occupancy,
-  survey volume, RSI), widening the radius where nothing local exists,
-  per tech lead review of PR #6. Proxy columns will be labelled as proxies,
-  never merged into camera counts.
+- **Today:** camera stays `enabled: false` (reported as unavailable), and a
+  `footfall_proxy` fills in from nearby signals in widening 5km / 15km
+  circles, per tech lead review of PR #6. Proxy columns are labelled as
+  proxies, never merged into camera counts:
+
+  | Node | proxy_camera_count | proxy_survey_count |
+  |---|---|---|
+  | Mikuni Port | Tojinbo camera, 3.3km | 6 areas within 5km |
+  | Awara Onsen | Tojinbo camera, 6.2km | 6 areas within 5km |
+  | Maruoka Castle | Fukui Station camera, 11.1km | 1 area within 5km |
+  | Eiheiji | Fukui Station camera, 12.2km | 2 areas within 5km |
+  | Katsuyama | none within 15km | 6 areas within 5km |
+  | Ono Castle Town | none within 15km | 1 area within 5km |
+
+  Hotel occupancy (`occ`) is the third proxy signal and already comes from
+  the hotel source. A 30km circle was tried but reached Fukui Station (a
+  city hub) for Katsuyama and Ono, too different a place to stand in.
+- **Suggested:** any people-flow source for Katsuyama or Ono (e.g. Dinosaur
+  Museum visitor counts) would replace a weak proxy with a real count.
 
 ### Hotel
 - **Area-specific feeds:** Fukui Station (fukui-station-kanko-reservation),
@@ -68,6 +81,11 @@ area-specific reservation feed exists.
   baseline, not a daily signal:
   https://www.mlit.go.jp/road/census/r3/ and
   https://www.pref.fukui.lg.jp/doc/douken/census/r3census.html
+- **Considered, not used:** Google Maps (Routes API). It gives travel time
+  in traffic (congestion), not vehicle counts, has no history, and its
+  terms restrict storing results, which a daily model needs. It is also
+  paid beyond a free monthly allowance. TomTom / HERE flow APIs have free
+  tiers but similar limits (speed, not counts; storage terms to check).
 
 ### Weather (JMA ETRN)
 - **Eiheiji** uses Fukui station (~12km). The closer Miyama station

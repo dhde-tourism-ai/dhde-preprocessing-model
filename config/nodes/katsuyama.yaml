@@ -49,3 +49,7 @@ sources:
       2026-09-27). The earlier ~22.5km figure was the CCTV layer only; the
       permanent layer was not checked then. NOT confirmed to sit on the
       road to the Dinosaur Museum; verify before relying on it.
+
+  footfall_proxy:
+    enabled: true  # no camera here: nearest camera + pooled nearby survey volume
+    radii_km: [5, 15]  # 30km would reach Fukui Station, a city hub: too different to stand in

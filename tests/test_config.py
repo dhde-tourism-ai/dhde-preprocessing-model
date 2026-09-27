@@ -26,7 +26,11 @@ def test_list_configured_nodes_finds_all_nine():
 @pytest.mark.parametrize("node_key", list_configured_nodes())
 def test_every_node_config_loads(node_key):
     cfg = load_node_config(node_key)
-    assert set(cfg["sources"]) == {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
+    required = {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
+    assert required <= set(cfg["sources"]) <= required | {"footfall_proxy"}
+    # A proxy only makes sense where the node has no camera of its own.
+    if cfg["sources"].get("footfall_proxy", {}).get("enabled"):
+        assert not cfg["sources"]["camera"].get("enabled")
 
 
 def test_load_node_config_mismatched_key_raises(tmp_path):

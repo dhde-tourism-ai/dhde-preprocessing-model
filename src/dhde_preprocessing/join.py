@@ -18,6 +18,7 @@ import pandas as pd
 from .config import load_node_config
 from .validation import SourceReport, print_report
 from .sources.camera import load_camera
+from .sources.footfall_proxy import load_footfall_proxy
 from .sources.hotel import load_hotel
 from .sources.rsi import load_rsi
 from .sources.survey import load_survey
@@ -30,6 +31,7 @@ SOURCE_LOADERS = {
     "rsi": load_rsi,
     "hotel": load_hotel,
     "traffic": load_traffic,
+    "footfall_proxy": load_footfall_proxy,  # camera-less nodes only, see module docstring
     # survey is handled separately below — it's response-level, not date-unique
 }
 
