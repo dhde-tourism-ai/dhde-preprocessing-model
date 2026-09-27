@@ -19,6 +19,7 @@ from .config import load_node_config
 from .validation import SourceReport, print_report
 from .sources.camera import load_camera
 from .sources.hotel import load_hotel
+from .sources.info_desk import load_info_desk
 from .sources.rsi import load_rsi
 from .sources.survey import load_survey
 from .sources.traffic import load_traffic
@@ -30,8 +31,14 @@ SOURCE_LOADERS = {
     "rsi": load_rsi,
     "hotel": load_hotel,
     "traffic": load_traffic,
+    "info_desk": load_info_desk,
     # survey is handled separately below — it's response-level, not date-unique
 }
+
+# Sources only some nodes declare (info_desk exists for Kanazawa only).
+# Skipped entirely when absent from a node's config, so existing nodes'
+# coverage reports don't grow an "unavailable" line for them.
+OPTIONAL_SOURCES = {"info_desk"}
 
 
 def build_node_table(node_key: str) -> tuple[pd.DataFrame, pd.DataFrame | None, list[SourceReport]]:
@@ -42,6 +49,8 @@ def build_node_table(node_key: str) -> tuple[pd.DataFrame, pd.DataFrame | None, 
 
     print(f"\n=== Building node '{node_key}' ({node_cfg.get('label', node_key)}) ===")
     for source_name, loader in SOURCE_LOADERS.items():
+        if source_name in OPTIONAL_SOURCES and source_name not in node_cfg["sources"]:
+            continue
         df, report = loader(node_cfg)
         reports.append(report)
         print_report(report)

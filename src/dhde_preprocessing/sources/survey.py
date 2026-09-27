@@ -33,6 +33,7 @@ import pandas as pd
 
 from ..config import resolve_path
 from ..validation import SourceReport, unavailable_report, validate_daily
+from .survey_milli import load_milli_survey
 
 CHUNK_SIZE = 50_000
 
@@ -51,6 +52,10 @@ def load_survey(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     survey_cfg = node_cfg["sources"].get("survey", {})
     if not survey_cfg.get("enabled"):
         return None, unavailable_report("survey", node_key, survey_cfg.get("reason", "survey disabled for this node"))
+
+    # Ishikawa nodes read Milli's QR survey instead — see survey_milli.py.
+    if survey_cfg.get("provider") == "milli":
+        return load_milli_survey(node_cfg)
 
     repo_root = resolve_path(survey_cfg["repo"])
     area_ids = survey_cfg["area_ids"]

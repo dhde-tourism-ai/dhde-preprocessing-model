@@ -149,6 +149,41 @@ it isn't naturally one-row-per-day).
   label crashes with `UnicodeEncodeError` on a default Windows terminal
   (cp1252).
 
+## Ishikawa nodes
+
+`kanazawa`, `kaga_onsen`, `komatsu` and `nanao` are Ishikawa nodes. They
+use the same pipeline, but every code4fukui dataset is Fukui-only, so
+each gets only what really exists for Ishikawa — never Fukui data as a
+stand-in:
+
+| Source | Ishikawa | From |
+|---|---|---|
+| weather | all four | JMA, `prec_no: "56"` |
+| traffic | kanazawa (~1.2km), komatsu (~5.7km) | JARTIC; kaga_onsen and nanao disabled, nearest points ~6.6km / ~7.0km |
+| survey | all four | Milli QR survey (`provider: milli`), matched on facility 市町 |
+| info_desk | kanazawa only | Milli's 金沢駅 and 金沢中央 tourist desk enquiry counts |
+| camera, rsi, hotel | none | disabled with a reason in each config |
+
+- **Milli** ([site](https://sites.google.com/view/milli-ishikawa-pref/)) is
+  Ishikawa Prefecture's tourism open-data project. It publishes public
+  Google Sheets, not a git repo, so `sources/gsheet.py` pulls each
+  sheet's CSV export every run and caches it under
+  `{workspace_root}/milli_cache/`, falling back to the cache if the
+  fetch fails.
+- **Survey responses carry a facility name, not a municipality.** The
+  municipality comes from Milli's separate facility list, joined on
+  (エリア, 施設). ~1% of responses name a facility missing from that list
+  and are dropped (counted in the report notes).
+- **Milli survey counts are not comparable with Fukui's.** They depend
+  on how many QR posters each prefecture put up. Compare trends within
+  Ishikawa, not levels across prefectures.
+- **`info_desk` is an optional source.** `join.py` skips it for nodes
+  whose config doesn't declare it, so Fukui coverage reports are
+  unchanged. Its sheets lag a month or two behind.
+- **`nanao` has large survey gaps** (576 empty days since 2023-09) —
+  most likely because Wakura Onsen closed after the January 2024 Noto
+  earthquake. Real, not a pipeline bug.
+
 ## Why survey is handled differently from the other five sources
 
 The other five sources are naturally one-row-per-day. Survey responses
