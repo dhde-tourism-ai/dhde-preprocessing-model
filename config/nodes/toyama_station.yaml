@@ -27,8 +27,9 @@ sources:
   hotel:
     enabled: false
     reason: >
-      The code4fukui reservation repos cover Fukui areas only. No daily
-      Toyama reservation feed was found.
+      The code4fukui reservation repos cover Fukui areas only; no daily
+      Toyama reservation feed was found. Hotel availability comes from
+      the separate rakuten source below.
 
   weather:
     enabled: true

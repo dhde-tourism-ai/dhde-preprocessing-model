@@ -24,9 +24,9 @@ sources:
   hotel:
     enabled: false
     reason: >
-      The code4fukui reservation repos cover Fukui areas only. The only
-      Ishikawa accommodation figure found is JTA's monthly prefecture-wide
-      total, which is not a daily per-node signal.
+      The code4fukui reservation repos cover Fukui areas only; no daily
+      Ishikawa reservation feed was found. Hotel availability comes from
+      the separate rakuten source below.
 
   weather:
     enabled: true

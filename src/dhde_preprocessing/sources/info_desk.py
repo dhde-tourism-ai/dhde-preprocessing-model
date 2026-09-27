@@ -8,9 +8,10 @@ per day per enquiry category (金沢市内観光, 加賀, 能登, 外国人, ...
 
 Only the 合計 (total) and 外国人 (foreign visitors) rows are kept, summed
 across the node's configured desks. This is a demand signal (people
-walking up to ask for help), which Ishikawa otherwise lacks — there is
-no camera, RSI or daily hotel data there. The sheets lag by a month or
-two, so the most recent days will be missing from this source.
+walking up to ask for help, mostly visitors rather than residents) —
+Kanazawa has no camera or RSI data, and Rakuten only covers hotel
+availability. The sheets lag by a month or two, so the most recent days
+will be missing from this source.
 """
 from __future__ import annotations
 
