@@ -25,7 +25,7 @@ def test_list_configured_nodes_finds_all_twelve():
 def test_every_node_config_loads(node_key):
     cfg = load_node_config(node_key)
     required = {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
-    optional = {"info_desk", "monthly_visitors"}
+    optional = {"info_desk", "monthly_visitors", "rakuten"}
     assert required <= set(cfg["sources"]) <= required | optional
 
 

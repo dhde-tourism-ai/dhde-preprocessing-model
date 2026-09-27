@@ -21,6 +21,7 @@ from .sources.camera import load_camera
 from .sources.hotel import load_hotel
 from .sources.info_desk import load_info_desk
 from .sources.monthly_visitors import load_monthly_visitors
+from .sources.rakuten import load_rakuten
 from .sources.rsi import load_rsi
 from .sources.survey import load_survey
 from .sources.traffic import load_traffic
@@ -34,14 +35,15 @@ SOURCE_LOADERS = {
     "traffic": load_traffic,
     "info_desk": load_info_desk,
     "monthly_visitors": load_monthly_visitors,
+    "rakuten": load_rakuten,
     # survey is handled separately below — it's response-level, not date-unique
 }
 
 # Sources only some nodes declare (info_desk exists for Kanazawa only;
-# monthly_visitors is opt-in per node). Skipped entirely when absent from
+# monthly_visitors and rakuten are opt-in per node). Skipped entirely when absent from
 # a node's config, so existing nodes' output and coverage reports don't
 # change until their config opts in.
-OPTIONAL_SOURCES = {"info_desk", "monthly_visitors"}
+OPTIONAL_SOURCES = {"info_desk", "monthly_visitors", "rakuten"}
 
 
 def build_node_table(node_key: str) -> tuple[pd.DataFrame, pd.DataFrame | None, list[SourceReport]]:

@@ -165,6 +165,7 @@ prefecture's data as a stand-in:
 | camera | none | toyama_station only — Toyama City AI cameras (`provider: toyama_city`), from 2023-02 |
 | info_desk | kanazawa only — Kanazawa tourist desk enquiries | none |
 | monthly_visitors | all four | all four |
+| rakuten | all four | all four |
 | rsi, hotel | none | none |
 
 **`monthly_visitors` is the cross-prefecture comparison signal.** It
@@ -176,6 +177,17 @@ nodes can opt in with the same 5 config lines (Fukui pref lgcode 18,
 e.g. Fukui city 18201, Sakai 18210). Survey counts are **not** comparable
 across prefectures — each prefecture runs its own questionnaire and
 poster placement — so compare survey trends within a prefecture only.
+
+**`rakuten` is the cross-prefecture hotel signal.** Rakuten Travel API:
+hotels listed within 3km of each node, and the share still with a room
+for 2 adults 1, 7 and 30 days before each stay date, plus the cheapest
+charge. Availability on one site, not bookings — so it sits beside
+Fukui's `hotel` source rather than replacing it. Credentials come from
+the `RAKUTEN_APP_ID` / `RAKUTEN_ACCESS_KEY` environment variables, never
+config (public repo). **No history:** each run appends a snapshot to
+`{workspace_root}/rakuten_snapshots/{node}.csv`, so it must run daily;
+the series starts 2026-09-27. Fukui nodes can opt in with the same
+config block.
 
 - **Where the data comes from.** Sibling repos, like the Fukui sources:
   `ishikawa-kanko-survey` and `japan-kanko-stat` (both code4fukui). Over
@@ -195,7 +207,7 @@ poster placement — so compare survey trends within a prefecture only.
   0. A day only gets a desk total when every desk has a value. Toyama
   cameras are kept as separate columns per camera, never summed (one
   person can pass both). Spending answers stay as yen-range text.
-- **Optional sources.** `info_desk` and `monthly_visitors` are skipped
+- **Optional sources.** `info_desk`, `monthly_visitors` and `rakuten` are skipped
   for nodes whose config doesn't declare them, so Fukui output is
   unchanged.
 - **Real gaps, not pipeline bugs:** `nanao` has 576 survey-free days

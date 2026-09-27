@@ -57,3 +57,9 @@ sources:
     repo: japan-kanko-stat
     city_lgcode: 17203
     pref_lgcode: 17
+
+  rakuten:
+    enabled: true
+    search_radius_km: 3
+    lead_days: [1, 7, 30]
+    adult_num: 2
