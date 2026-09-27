@@ -42,7 +42,8 @@ missing read as zero). Columns and rules: [`docs/integrated_dataset.md`](docs/in
 
 What's missing per node, and what's used instead, is tracked in
 [`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in
-[`docs/site_capacity.md`](docs/site_capacity.md).
+[`docs/site_capacity.md`](docs/site_capacity.md). Suggested Osaka and Kyoto sources, and what each really contains, are in
+[`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md).
 
 ## The template pattern
 
