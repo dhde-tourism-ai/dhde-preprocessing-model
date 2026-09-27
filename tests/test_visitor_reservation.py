@@ -41,4 +41,7 @@ def test_uses_visit_day_snapshot_and_flags_fallback(repo):
     assert df.loc["2025-01-03", "reserved_visitors"] == 60   # latest earlier snapshot
     assert not df.loc["2025-01-02", "from_earlier_snapshot"]
     assert df.loc["2025-01-03", "from_earlier_snapshot"]
+    # 2025-01-03 is after the latest snapshot (01-02): bookings so far, not final.
+    assert df.loc["2025-01-02", "bookings_final"]
+    assert not df.loc["2025-01-03", "bookings_final"]
     assert any("empty snapshot" in n for n in report.notes)

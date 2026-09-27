@@ -7,6 +7,9 @@ coordinates:
 sources:
   camera:
     enabled: true
+    # A city transport hub: its footfall doesn't track tourist sites, so it
+    # is never used as another node's footfall proxy (see footfall_proxy.py).
+    proxy_eligible: false
     gates:
       - name: fukui_station
         person_csv: fukui-kanko-people-flow-data/full/fukui-station-east-entrance/Person.csv

@@ -46,8 +46,8 @@ existing node's YAML, adjust:
 | `hotel` | `repo` (use a node-specific reservation repo if one exists, e.g. `fukui-station-kanko-reservation` — falls back to the regional `echizen-coast-kanko-reservation` otherwise) and `scope` (`station-specific` or `regional`, just for the report notes). Price-sanity bounds are derived automatically from whichever repo you point at — see caveat below. |
 | `survey` | `repo`, `area_ids` — the 親番号 (parent number) value(s) from fukui-kanko-survey's `area.csv`, **not** its `id` column (see caveat below). |
 | `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API on both layers and check the distance before assuming (see caveat below), not just because a node exists. Optional `layer` picks the permanent-counter layer instead of the default CCTV one. |
-| `footfall_proxy` | Optional, only for nodes with **no camera**: `enabled: true` and `radii_km` (default `[5, 15]`). Adds `proxy_camera_count` (nearest other node's Person.csv camera inside the first circle that has one) and `proxy_survey_count` (responses pooled across all survey areas inside the first circle that has any). Labelled proxies, never merged into real camera counts; see `sources/footfall_proxy.py`. |
-| `visitor_reservation` | Optional, only where an attraction publishes entry bookings: `enabled: true` and `repo` (currently `dinosaur-opendata` for Katsuyama). Adds `reserved_visitors` / `reserved_fee` from the visit-day snapshot. Reserved entries only, not total visitors; see `sources/visitor_reservation.py`. |
+| `footfall_proxy` | Optional, only for nodes with **no camera**: `enabled: true` and `radii_km` (default `[5, 15]`). Adds `proxy_camera_count` (nearest other node's Person.csv camera inside the first circle that has one; a camera marked `proxy_eligible: false`, like Fukui Station's, is never used) and `proxy_survey_count` (responses pooled across all survey areas inside the first circle that has any). Labelled proxies, never merged into real camera counts; see `sources/footfall_proxy.py`. |
+| `visitor_reservation` | Optional, only where an attraction publishes entry bookings: `enabled: true` and `repo` (currently `dinosaur-opendata` for Katsuyama). Adds `reserved_visitors` / `reserved_fee` from the visit-day snapshot, and `bookings_final` (False for future dates, which are bookings so far). Reserved entries only, not total visitors; see `sources/visitor_reservation.py`. |
 | `road_congestion` | `enabled: true` and `radius_km` (default 2). Live TomTom Orbis traffic-flow tiles; needs the `TOMTOM_API_KEY` environment variable (free tier, no card). Adds `road_congestion` (1 - mean relative speed of roads within the radius) plus relative-speed columns. Snapshots are cached under `{workspace_root}/tomtom_cache/`, so history only builds up if the pipeline runs on a schedule; see `sources/road_congestion.py`. |
 
 Every source function has the signature `load_x(node_cfg) -> (df | None, SourceReport)`. If you add a 7th source
@@ -62,7 +62,10 @@ current state, so their history exists only if we save it.
 `scripts/collect_live.py` pulls both for every node, and
 `.github/workflows/collect-live-data.yml` runs it hourly (06:15 to 21:15 JST)
 and commits the results to the `live-data` branch, keeping main free of data
-commits. It needs the `TOMTOM_API_KEY` repository secret (Settings → Secrets
+commits. The build reads that history back: point `DHDE_LIVE_DATA_ROOT` at a
+checkout of the `live-data` branch (defaults to the workspace root), and
+`traffic` merges it with each live pull while `road_congestion` reads its
+saved snapshots. It needs the `TOMTOM_API_KEY` repository secret (Settings → Secrets
 and variables → Actions); without it only JARTIC is collected. Scheduled
 workflows only run from the default branch, so collection starts once this is
 merged to main.

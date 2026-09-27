@@ -23,8 +23,6 @@ import os
 import sys
 from pathlib import Path
 
-import pandas as pd
-
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -32,16 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from dhde_preprocessing.config import list_configured_nodes, load_node_config
 from dhde_preprocessing.sources import road_congestion
-from dhde_preprocessing.sources.traffic import load_traffic
+from dhde_preprocessing.sources.traffic import HISTORY_DIR, load_traffic
 from dhde_preprocessing.validation import print_report
-
-
-def upsert_daily(existing: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
-    """Merge daily rows by date; the newer pull wins for dates in both
-    (the most recent day is partial until the next run completes it)."""
-    both = pd.concat([existing, new], ignore_index=True)
-    both["date"] = pd.to_datetime(both["date"])
-    return both.drop_duplicates("date", keep="last").sort_values("date").reset_index(drop=True)
 
 
 def main() -> int:
@@ -50,10 +40,9 @@ def main() -> int:
     args = parser.parse_args()
     out = Path(args.out).resolve()
 
-    # road_congestion keeps its snapshot cache under the workspace root;
-    # nothing else collected here reads from it.
-    os.environ["DHDE_WORKSPACE_ROOT"] = str(out)
-    jartic_dir = out / "jartic_history"
+    # Both sources read and write their saved history under the live-data root.
+    os.environ["DHDE_LIVE_DATA_ROOT"] = str(out)
+    jartic_dir = out / HISTORY_DIR
     jartic_dir.mkdir(parents=True, exist_ok=True)
 
     failures = 0
@@ -67,10 +56,8 @@ def main() -> int:
 
         df, report = load_traffic(cfg)
         print_report(report)
-        if df is not None:
-            path = jartic_dir / f"{node_key}_traffic_daily.csv"
-            existing = pd.read_csv(path) if path.exists() else df.iloc[0:0]
-            upsert_daily(existing, df).to_csv(path, index=False)
+        if df is not None:  # load_traffic already merged it with the saved history
+            df.to_csv(jartic_dir / f"{node_key}_traffic_daily.csv", index=False)
         elif report.status == "error":
             failures += 1
 

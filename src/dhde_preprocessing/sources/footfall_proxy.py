@@ -8,7 +8,8 @@ into a score (that's a modeling-stage decision). It only pulls
 already-real signals from a wider area and labels them as proxies:
 
 - proxy_camera_count: daily person count from the NEAREST other node's
-  camera, searched in widening circles (config `radii_km`, default 5 →
+  camera (skipping any camera marked `proxy_eligible: false`, e.g. Fukui
+  Station, a city hub too unlike tourist sites to stand in), searched in widening circles (config `radii_km`, default 5 →
   15km; 30km was tried and reached Fukui Station, a city hub too unlike
   Katsuyama to stand in). Only Person.csv sensors qualify — Rainbow Line's
   LicensePlate.csv gates count vehicles, so they're never used as a
@@ -49,8 +50,8 @@ def _person_sensor(cfg: dict) -> str | None:
     """First Person.csv path of a node's camera, or None (no camera, or
     vehicle-only gates like Rainbow Line)."""
     cam = cfg["sources"].get("camera", {})
-    if not cam.get("enabled"):
-        return None
+    if not cam.get("enabled") or cam.get("proxy_eligible") is False:
+        return None  # no camera, or its node is too unlike others to stand in
     for gate in cam.get("gates", []):
         if gate.get("person_csv"):
             return gate["person_csv"]
@@ -78,7 +79,7 @@ def _nearest_camera(node_cfg: dict, all_cfgs: list[dict], radii_km: list[float])
 def _camera_proxy(node_cfg, all_cfgs, radii_km, notes):
     found = _nearest_camera(node_cfg, all_cfgs, radii_km)
     if found is None:
-        notes.append(f"no Person.csv camera within {max(radii_km)}km — proxy_camera_count unavailable")
+        notes.append(f"no eligible Person.csv camera within {max(radii_km)}km (vehicle-only and proxy_eligible: false cameras are skipped) — proxy_camera_count unavailable")
         return None
     dist, key, path, radius = found
     notes.append(f"proxy_camera_count: {key} camera, {dist:.1f}km away ({radius}km circle)")

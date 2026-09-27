@@ -30,11 +30,13 @@ won't hold it.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
 import requests
 
+from ..config import resolve_live_path
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 API_BASE = "https://api.jartic-open-traffic.org/geoserver"
@@ -44,6 +46,15 @@ LAYER = "t_travospublic_measure_1h_img"  # CCTV AI counter, hourly — default l
 # (Eiheiji, Katsuyama). Selected per node via `layer:` in its config.
 PERMANENT_LAYER = "t_travospublic_measure_1h"
 DEFAULT_WINDOW_DAYS = 90
+HISTORY_DIR = "jartic_history"  # written by scripts/collect_live.py
+
+
+def merge_history(existing: pd.DataFrame | None, new: pd.DataFrame | None) -> pd.DataFrame:
+    """Merge daily rows by date; the newer pull wins for dates in both
+    (the most recent day is partial until the next pull completes it)."""
+    both = pd.concat([d for d in (existing, new) if d is not None and not d.empty], ignore_index=True)
+    both["date"] = pd.to_datetime(both["date"])
+    return both.drop_duplicates("date", keep="last").sort_values("date").reset_index(drop=True)
 
 
 def _query_point_range(point_code: int, start: datetime, end: datetime, layer: str = LAYER) -> list[dict]:
@@ -82,18 +93,28 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=window_days)
 
+    notes = [
+        f"point_code={point_code} (layer {layer}), ~{distance_km}km from node coordinates — "
+        f"NOT confirmed to be on the site's actual access road, see module docstring",
+    ]
+    history_path = Path(resolve_live_path(HISTORY_DIR)) / f"{node_key}_traffic_daily.csv"
+    history = pd.read_csv(history_path) if history_path.exists() else None
+
     try:
         features = _query_point_range(point_code, start, end, layer)
     except requests.RequestException as e:
-        return None, SourceReport(source="traffic", node_key=node_key, status="error",
-                                   notes=[f"JARTIC API request failed: {e!r}"])
+        features, live_error = [], f"JARTIC API request failed: {e!r}"
+    else:
+        live_error = None if features else (
+            f"point {point_code} returned zero rows for the last {window_days} days — "
+            f"point may be offline, or the trailing window has already aged out of JARTIC's retention")
 
-    if not features:
-        return None, SourceReport(
-            source="traffic", node_key=node_key, status="error",
-            notes=[f"point {point_code} returned zero rows for the last {window_days} days — "
-                   f"point may be offline, or the trailing window has already aged out of JARTIC's retention"],
-        )
+    if live_error:
+        if history is None:
+            return None, SourceReport(source="traffic", node_key=node_key, status="error", notes=notes + [live_error])
+        daily = merge_history(history, None)
+        notes += [live_error, f"using saved history only ({len(daily)} days from {history_path.name})"]
+        return daily, validate_daily(daily, source="traffic", node_key=node_key, notes=notes)
 
     rows = []
     for f in features:
@@ -112,10 +133,11 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         hours_observed=("volume_total", "size"),
     ).reset_index().rename(columns={"datetime": "date"})
 
-    notes = [
-        f"point_code={point_code} (layer {layer}), ~{distance_km}km from node coordinates — "
-        f"NOT confirmed to be on the site's actual access road, see module docstring",
-        f"live API pull, {window_days}-day trailing window only — no historical backfill available",
-    ]
+    if history is not None:
+        daily = merge_history(history, daily)
+        notes.append(f"live {window_days}-day pull merged with saved history ({history_path.name})")
+    else:
+        notes.append(f"live API pull, {window_days}-day trailing window only — no saved history found "
+                     f"under {HISTORY_DIR}/ (run scripts/collect_live.py on a schedule)")
     report = validate_daily(daily, source="traffic", node_key=node_key, notes=notes)
     return daily, report

@@ -71,6 +71,8 @@ def load_visitor_reservation(node_cfg: dict) -> tuple[pd.DataFrame | None, Sourc
 
     latest = snaps["snapshot"].max()
     future = out["date"] > latest
+    # Future visit dates are bookings so far and will still grow.
+    out["bookings_final"] = ~future
     notes = [
         f"source: {repo} — reserved entries, not total visitors (~57% of reported FY2025 visitors)",
         f"{int((out['from_earlier_snapshot'] & ~future).sum())} past day(s) taken from an earlier snapshot (lead-0 missing)",

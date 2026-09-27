@@ -37,17 +37,19 @@ area-specific reservation feed exists.
   | Node | proxy_camera_count | proxy_survey_count |
   |---|---|---|
   | Awara Onsen | Tojinbo camera, 6.2km | 6 areas within 5km |
-  | Eiheiji | Fukui Station camera, 12.2km | 2 areas within 5km |
+  | Eiheiji | none (Fukui Station excluded) | 2 areas within 5km |
   | Katsuyama | none within 15km | 6 areas within 5km |
 
   Hotel occupancy (`occ`) is the third proxy signal and already comes from
-  the hotel source. A 30km circle was tried but reached Fukui Station (a
-  city hub) for Katsuyama, too different a place to stand in.
+  the hotel source. Fukui Station's camera is marked `proxy_eligible:
+  false`: it's a city transport hub, too unlike a temple or museum to stand
+  in (this is why Eiheiji, 12.2km away, gets no camera proxy).
 - **Katsuyama has a near-direct visitor signal instead:** Dinosaur Museum
   advance entry bookings from code4fukui/dinosaur-opendata, daily since
   2023-09 (`visitor_reservation` source, `reserved_visitors` column).
   Reserved entries only: ~57% of reported FY2025 visitors (738k of 1.30M),
-  so walk-ins and same-day tickets are missing.
+  so walk-ins and same-day tickets are missing. Future visit dates are
+  bookings so far (`bookings_final` = False).
 
 ### Hotel
 - **Area-specific feeds:** Fukui Station (fukui-station-kanko-reservation),
@@ -65,8 +67,9 @@ area-specific reservation feed exists.
   not a daily series, so it can't give occupancy.
 
 ### RSI (fukui-kanko-trend-data)
-- **Sakai City** (Tojinbo) only exists in the 2026 folder; earlier dates
-  are filled from the prefecture-wide total.
+- **Sakai City** (Tojinbo) only exists in the 2026 folder, so only 29 of
+  Tojinbo's 994 RSI days are town-level; the rest are filled from the
+  prefecture-wide total. This predates PR #6.
 - **Fukui City** (Fukui Station) is not tracked; prefecture total only.
 - **Open question:** whether the modelling stage should use filled dates
   or treat them as missing.
@@ -76,8 +79,10 @@ area-specific reservation feed exists.
   both the CCTV and permanent-counter layers.
 - **Flagged:** every enabled point is within 2.5 to 5.3km of its node but
   not confirmed to sit on the visitor access road.
-- **No history:** JARTIC keeps hourly data for roughly 3 to 4 months only.
-  A scheduled daily pull is needed to build up history.
+- **No history from the API:** JARTIC keeps hourly data for roughly 3 to 4
+  months only. `scripts/collect_live.py` (hourly GitHub Action) saves it to
+  the `live-data` branch, and the build merges that saved history with each
+  live pull (point `DHDE_LIVE_DATA_ROOT` at a checkout of the branch).
 - **Suggested:** MLIT road traffic census 2021 (free CSV, covers
   prefectural roads such as Route 305 near Tojinbo), usable as a static
   baseline, not a daily signal:
@@ -94,7 +99,8 @@ area-specific reservation feed exists.
     First live snapshot (2026-09-27): Eiheiji and Rainbow Line read exactly
     free-flow (1.00), which may be real or a fallback to typical speeds.
     Cross-check against JARTIC at the four nodes that have both.
-  - Live only: history builds only if the pipeline runs on a schedule.
+  - Live only: history comes from the same hourly collector and
+    `live-data` branch. Without a key the source is reported unavailable.
   - **Open:** TomTom's terms on caching/storing data have not been
     verified yet (page only renders in a browser); check before relying on
     stored history in production.

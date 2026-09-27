@@ -17,7 +17,7 @@ cross-check against JARTIC at nodes that have both before relying on it.
 Each run takes one live snapshot per node: every segment within
 `radius_km` of the node (zoom-14 tiles, ~2km wide) is averaged. Like
 JARTIC, TomTom keeps no history for us, so snapshots are appended to
-`{workspace_root}/tomtom_cache/{node_key}_road_congestion.csv` and the
+`{live_data_root}/tomtom_cache/{node_key}_road_congestion.csv` and the
 daily table is aggregated from that cache — history only builds up if
 this runs on a schedule. NOTE: TomTom's terms on caching/storing Content
 were not verified when this was written; check them before relying on
@@ -38,7 +38,7 @@ import mapbox_vector_tile
 import pandas as pd
 import requests
 
-from ..config import resolve_path
+from ..config import resolve_live_path
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 TILE_URL = "https://api.tomtom.com/maps/orbis/traffic/tile/flow/{z}/{x}/{y}.pbf"
@@ -126,14 +126,18 @@ def load_road_congestion(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRep
 
     radius_km = cfg.get("radius_km", DEFAULT_RADIUS_KM)
     zoom = cfg.get("zoom", DEFAULT_ZOOM)
-    cache_path = Path(resolve_path(CACHE_DIR)) / f"{node_key}_road_congestion.csv"
+    cache_path = Path(resolve_live_path(CACHE_DIR)) / f"{node_key}_road_congestion.csv"
     cache = pd.read_csv(cache_path) if cache_path.exists() else pd.DataFrame(columns=SNAPSHOT_COLS)
     notes = [f"TomTom Orbis flow tiles, segments within {radius_km}km, zoom {zoom}; "
              f"no per-segment confidence (rural reliability unverified)"]
 
     key = os.environ.get(KEY_ENV, "")
     if not key:
-        notes.append(f"{KEY_ENV} not set: no new snapshot this run")
+        if cache.empty:
+            # Setup gap, not a failure: same status as any other missing source.
+            return None, unavailable_report(
+                "road_congestion", node_key, f"{KEY_ENV} not set and no saved snapshots yet")
+        notes.append(f"{KEY_ENV} not set: no new snapshot this run, using saved snapshots only")
     else:
         c = node_cfg["coordinates"]
         try:

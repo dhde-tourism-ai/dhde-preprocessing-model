@@ -60,7 +60,7 @@ def test_vehicle_only_camera_is_never_a_people_proxy(workspace):
     vehicles = _node("rl", 36.01, 136.01, camera={"enabled": True, "gates": [{"name": "g", "license_plate_csv": "lp.csv"}]})
     df, report = fp.load_footfall_proxy(here, all_node_cfgs=[here, vehicles])
     assert "proxy_camera_count" not in df.columns
-    assert any("no Person.csv camera" in n for n in report.notes)
+    assert any("no eligible Person.csv camera" in n for n in report.notes)
 
 
 def test_widens_circle_until_a_camera_is_found(workspace):
@@ -69,3 +69,13 @@ def test_widens_circle_until_a_camera_is_found(workspace):
     df, report = fp.load_footfall_proxy(here, all_node_cfgs=[here, cam_node])
     assert "proxy_camera_count" in df.columns
     assert any("15km circle" in n for n in report.notes)
+
+
+def test_camera_marked_not_proxy_eligible_is_skipped(workspace):
+    # Fukui Station is a city hub: its camera must not stand in for a
+    # mountain temple even when it's the only one within range.
+    here = _node("here", 36.0, 136.0, proxy={"enabled": True, "radii_km": [5, 15]})
+    hub = _node("hub", 36.05, 136.05, camera={"enabled": True, "proxy_eligible": False,
+                                               "gates": [{"name": "g", "person_csv": "person.csv"}]})
+    df, report = fp.load_footfall_proxy(here, all_node_cfgs=[here, hub])
+    assert "proxy_camera_count" not in df.columns
