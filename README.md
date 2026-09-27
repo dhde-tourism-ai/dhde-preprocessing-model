@@ -22,6 +22,10 @@ range, calendar gaps, null rates) and writes to `output/`:
 - `{node}_survey_responses.parquet` — raw response-level survey rows (see "Why survey is different" below)
 - `{node}_coverage_report.json` — the same coverage info as machine-readable JSON
 
+What's missing per node, and what's used instead, is tracked in
+[`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in
+[`docs/site_capacity.md`](docs/site_capacity.md).
+
 ## The template pattern
 
 Every node is: **one YAML config + the same six source modules**, nothing
@@ -41,12 +45,30 @@ existing node's YAML, adjust:
 | `rsi` | `repo`, `area_name` (a municipality tracked in code4fukui/fukui-kanko-trend-data's per-year folders) or `null` to use the prefecture-wide total only. |
 | `hotel` | `repo` (use a node-specific reservation repo if one exists, e.g. `fukui-station-kanko-reservation` — falls back to the regional `echizen-coast-kanko-reservation` otherwise) and `scope` (`station-specific` or `regional`, just for the report notes). Price-sanity bounds are derived automatically from whichever repo you point at — see caveat below. |
 | `survey` | `repo`, `area_ids` — the 親番号 (parent number) value(s) from fukui-kanko-survey's `area.csv`, **not** its `id` column (see caveat below). |
-| `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API and check the distance before assuming (see caveat below), not just because a node exists. |
+| `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API on both layers and check the distance before assuming (see caveat below), not just because a node exists. Optional `layer` picks the permanent-counter layer instead of the default CCTV one. |
+| `footfall_proxy` | Optional, only for nodes with **no camera**: `enabled: true` and `radii_km` (default `[5, 15]`). Adds `proxy_camera_count` (nearest other node's Person.csv camera inside the first circle that has one; a camera marked `proxy_eligible: false`, like Fukui Station's, is never used) and `proxy_survey_count` (responses pooled across all survey areas inside the first circle that has any). Labelled proxies, never merged into real camera counts; see `sources/footfall_proxy.py`. |
+| `visitor_reservation` | Optional, only where an attraction publishes entry bookings: `enabled: true` and `repo` (currently `dinosaur-opendata` for Katsuyama). Adds `reserved_visitors` / `reserved_fee` from the visit-day snapshot, and `bookings_final` (False for future dates, which are bookings so far). Reserved entries only, not total visitors; see `sources/visitor_reservation.py`. |
+| `road_congestion` | `enabled: true` and `radius_km` (default 2). Live TomTom Orbis traffic-flow tiles; needs the `TOMTOM_API_KEY` environment variable (free tier, no card). Adds `road_congestion` (1 - mean relative speed of roads within the radius) plus relative-speed columns. Snapshots are cached under `{workspace_root}/tomtom_cache/`, so history only builds up if the pipeline runs on a schedule; see `sources/road_congestion.py`. |
 
 Every source function has the signature `load_x(node_cfg) -> (df | None, SourceReport)`. If you add a 7th source
 type later, follow that same signature and register it in
 `join.py`'s `SOURCE_LOADERS` (or handle it separately like `survey`, if
 it isn't naturally one-row-per-day).
+
+## Collecting live data (history can't be backfilled)
+
+JARTIC keeps hourly traffic for only ~3 months and TomTom only gives the
+current state, so their history exists only if we save it.
+`scripts/collect_live.py` pulls both for every node, and
+`.github/workflows/collect-live-data.yml` runs it hourly (06:15 to 21:15 JST)
+and commits the results to the `live-data` branch, keeping main free of data
+commits. The build reads that history back: point `DHDE_LIVE_DATA_ROOT` at a
+checkout of the `live-data` branch (defaults to the workspace root), and
+`traffic` merges it with each live pull while `road_congestion` reads its
+saved snapshots. It needs the `TOMTOM_API_KEY` repository secret (Settings → Secrets
+and variables → Actions); without it only JARTIC is collected. Scheduled
+workflows only run from the default branch, so collection starts once this is
+merged to main.
 
 ## Non-obvious things found while building this — read before extending
 
@@ -90,10 +112,13 @@ it isn't naturally one-row-per-day).
   columns plus data-quality flag columns (`is_stale`, `was_imputed`,
   etc.) so nothing is hidden.
 
-  **This repo covers two different hotel datasets, same format, very
-  different price tiers** — `fukui-station-kanko-reservation` (3 hotels
-  near Fukui Station, 585 rooms, used for that node specifically) and
-  `echizen-coast-kanko-reservation` (regional, used for the other 3).
+  **This repo covers several hotel datasets, same format, very
+  different price tiers** — area-specific feeds where one exists
+  (`fukui-station-kanko-reservation`: 3 hotels near Fukui Station, 585
+  rooms; `fukui-kanko-reservation`: Awara Onsen;
+  `mikatagoko-kanko-reservation`: Mikata Five Lakes, used for Rainbow
+  Line) and `echizen-coast-kanko-reservation` (regional, used for every
+  other node).
   The original analysis's price-sanity check used a fixed 3,000–30,000
   JPY/room range, validated against the Fukui Station repo specifically.
   Applied as-is to the regional repo (real median price ~64,500 JPY — a
@@ -132,10 +157,13 @@ it isn't naturally one-row-per-day).
   bug this was actually hit and fixed.
 
 - **JARTIC (road traffic) coverage was checked empirically, not
-  assumed**, by querying the live API with each node's real coordinates:
-  Tojinbo (~14km to nearest point) and Katsuyama (~22.5km) are
-  `enabled: false`. Fukui Station (~2.7km) and Rainbow Line (~5km) are
-  `enabled: true` but flagged — a point exists nearby, but this has
+  assumed**, by querying the live API with each node's real coordinates
+  on **both** JARTIC layers — the CCTV AI counters (default) and the
+  permanent counters (`layer: t_travospublic_measure_1h` in the node
+  config; same property names, different point set). Tojinbo and Awara
+  Onsen have no point within 8km on either layer and are
+  `enabled: false`. The other four are `enabled: true` but flagged — a
+  point exists nearby (2.5–5.3km), but this has
   **not** been confirmed to sit on the road visitors actually use to
   reach the site. `distance_km` and `point_code` are carried into every
   build's coverage report so this stays visible. Also: JARTIC only

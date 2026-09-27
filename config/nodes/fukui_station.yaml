@@ -7,6 +7,9 @@ coordinates:
 sources:
   camera:
     enabled: true
+    # A city transport hub: its footfall doesn't track tourist sites, so it
+    # is never used as another node's footfall proxy (see footfall_proxy.py).
+    proxy_eligible: false
     gates:
       - name: fukui_station
         person_csv: fukui-kanko-people-flow-data/full/fukui-station-east-entrance/Person.csv
@@ -45,3 +48,7 @@ sources:
       coordinates, queried live 2026-09-25. NOT confirmed to sit on the
       actual road visitors use to reach the station; verify before
       treating this as a precise local signal.
+
+  road_congestion:
+    enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
+    radius_km: 2

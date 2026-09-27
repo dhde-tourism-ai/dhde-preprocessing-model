@@ -7,3 +7,4 @@ html5lib>=1.1
 beautifulsoup4>=4.12
 jpholiday>=0.1.9
 pytest>=7.0
+mapbox-vector-tile>=2.0

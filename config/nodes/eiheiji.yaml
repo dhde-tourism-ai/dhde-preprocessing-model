@@ -1,0 +1,59 @@
+node_key: eiheiji
+label: "Eiheiji Temple (大本山 永平寺)"
+coordinates:
+  lat: 36.0567754
+  lon: 136.3568759  # 大本山 永平寺 エリア, area.csv 親番号 300025
+
+sources:
+  camera:
+    enabled: false
+    reason: >
+      No camera source exists for Eiheiji in fukui-kanko-people-flow-data
+      (checked 2026-09-27). Do not fabricate one — this gap stays visible
+      in the coverage report as "unavailable."
+
+  weather:
+    enabled: true
+    # Closest station is 美山 (Miyama, 57071, ~6.5km), but it records
+    # precipitation only — no temperature, wind, sunshine or humidity.
+    # Fukui (~12km, same plain) is the nearest full-observation station.
+    station_name: "福井 (Fukui)"
+    station_id: "57066"
+    prec_no: "57"
+    block_no: "47616"
+    page: hourly_s1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: true
+    repo: fukui-kanko-trend-data
+    area_name: "永平寺町"  # tracked from the 2024 folder onward
+
+  hotel:
+    enabled: true
+    repo: echizen-coast-kanko-reservation
+    scope: regional
+
+  survey:
+    enabled: true
+    repo: fukui-kanko-survey
+    area_ids: [300025]  # 大本山 永平寺 エリア (formerly 永平寺門前 エリア)
+
+  traffic:
+    enabled: true
+    layer: t_travospublic_measure_1h  # permanent counter layer, not CCTV
+    point_code: 6110870
+    distance_km: 2.5
+    reason: >
+      Included but flagged: permanent counter ~2.5km from the temple
+      (queried live 2026-09-27; nearest CCTV counter is ~10.4km). NOT
+      confirmed to sit on the road visitors use to reach Eiheiji; verify
+      before treating this as a precise local signal.
+
+  footfall_proxy:
+    enabled: true  # no camera here: nearest camera + pooled nearby survey volume
+    radii_km: [5, 15]  # 30km would reach Fukui Station, a city hub: too different to stand in
+
+  road_congestion:
+    enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
+    radius_km: 2

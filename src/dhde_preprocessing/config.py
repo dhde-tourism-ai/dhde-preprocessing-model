@@ -42,6 +42,44 @@ def resolve_path(relative_path: str) -> str:
     return f"{root}/{relative_path.lstrip('/')}"
 
 
+def read_csv_if_exists(path: str, **kwargs) -> "pd.DataFrame | None":
+    """Read a CSV written by a previous run, or None if there isn't one yet.
+
+    Takes the resolve_path() string as-is: wrapping it in pathlib.Path would
+    turn an s3:// root into a local "s3:" folder, so a missing-file check has
+    to go through pandas (FileNotFoundError works for local and s3 alike).
+    """
+    import pandas as pd
+
+    try:
+        return pd.read_csv(path, **kwargs)
+    except FileNotFoundError:
+        return None
+
+
+def write_csv(df: "pd.DataFrame", path: str) -> None:
+    """Write a CSV to a resolve_path() string, creating local parent dirs.
+    s3 has no directories, so there's nothing to create there."""
+    if "://" not in path:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    df.to_csv(path, index=False)
+
+
+def get_live_data_root() -> str:
+    """Where saved history of the live-only sources lives (JARTIC daily
+    rows, TomTom snapshots): the `live-data` branch written by
+    scripts/collect_live.py. Override with DHDE_LIVE_DATA_ROOT (e.g. a
+    checkout of that branch); defaults to the workspace root.
+    """
+    override = os.environ.get("DHDE_LIVE_DATA_ROOT")
+    return override.rstrip("/") if override else get_workspace_root()
+
+
+def resolve_live_path(relative_path: str) -> str:
+    """Like resolve_path, but under get_live_data_root()."""
+    return f"{get_live_data_root()}/{relative_path.lstrip('/')}"
+
+
 def load_node_config(node_key: str, config_dir: Path | str = DEFAULT_CONFIG_DIR) -> dict[str, Any]:
     """Load one node's YAML config (e.g. config/nodes/tojinbo.yaml)."""
     path = Path(config_dir) / "nodes" / f"{node_key}.yaml"

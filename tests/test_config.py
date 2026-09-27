@@ -13,9 +13,23 @@ def test_resolve_path_joins_without_mangling_s3_uri(monkeypatch):
     assert resolve_path("some-repo/data.csv") == "s3://my-bucket/dhde/some-repo/data.csv"
 
 
-def test_list_configured_nodes_finds_all_four():
+def test_list_configured_nodes_finds_the_six_priority_nodes():
+    # Scope is the six priority nodes; Kanazawa, Mikuni Port, Ono and Maruoka
+    # were dropped for now, see docs/data_gaps.md.
     nodes = list_configured_nodes()
-    assert nodes == ["fukui_station", "katsuyama", "rainbow_line", "tojinbo"]
+    assert nodes == [
+        "awara_onsen", "eiheiji", "fukui_station", "katsuyama", "rainbow_line", "tojinbo",
+    ]
+
+
+@pytest.mark.parametrize("node_key", list_configured_nodes())
+def test_every_node_config_loads(node_key):
+    cfg = load_node_config(node_key)
+    required = {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
+    assert required <= set(cfg["sources"]) <= required | {"footfall_proxy", "visitor_reservation", "road_congestion"}
+    # A proxy only makes sense where the node has no camera of its own.
+    if cfg["sources"].get("footfall_proxy", {}).get("enabled"):
+        assert not cfg["sources"]["camera"].get("enabled")
 
 
 def test_load_node_config_mismatched_key_raises(tmp_path):
