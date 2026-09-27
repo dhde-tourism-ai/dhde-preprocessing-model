@@ -94,3 +94,29 @@ def test_cheapest_charge_reads_room_daily_totals():
              {"roomInfo": [{"roomBasicInfo": {}}, {"dailyCharge": {"total": 9000}}]},
              {"roomInfo": [{"roomBasicInfo": {}}, {"dailyCharge": {"total": 7500}}]}]
     assert rakuten._cheapest_charge(hotel) == 7500.0
+
+
+def test_failed_request_never_puts_the_keys_in_the_report(env, monkeypatch):
+    """Regression: requests' errors embed the full URL, and the keys are
+    query parameters — they leaked into notes / coverage_report.json."""
+    monkeypatch.setenv("RAKUTEN_ACCESS_KEY", "SECRET-KEY-123")
+    monkeypatch.setattr(rakuten.time, "sleep", lambda *a: None)
+
+    class _Resp:
+        status_code, ok, text = 403, False, "forbidden"
+
+    def _get(url, params, timeout):
+        assert params["accessKey"] == "SECRET-KEY-123"
+        return _Resp()
+    monkeypatch.setattr(rakuten.requests, "get", _get)
+    df, report = rakuten.load_rakuten(_cfg())
+    assert "SECRET-KEY-123" not in str(report.to_dict())
+    assert "test-id" not in str(report.to_dict())
+    assert any("HTTP 403" in n for n in report.notes)
+
+    def _raise(url, params, timeout):
+        raise rakuten.requests.ConnectionError(f"failed for {url}?accessKey={params['accessKey']}")
+    monkeypatch.setattr(rakuten.requests, "get", _raise)
+    df, report = rakuten.load_rakuten(_cfg())
+    assert "SECRET-KEY-123" not in str(report.to_dict())
+    assert any("ConnectionError" in n for n in report.notes)

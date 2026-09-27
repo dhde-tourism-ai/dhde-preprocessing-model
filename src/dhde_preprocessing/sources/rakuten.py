@@ -29,19 +29,28 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import date, timedelta
-from pathlib import Path
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import requests
 
-from ..config import resolve_path
+from ..config import read_csv_if_exists, resolve_path, write_csv
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 API_BASE = "https://openapi.rakuten.co.jp/engine/api/Travel"
 SNAPSHOT_DIR = "rakuten_snapshots"
 SNAPSHOT_COLS = ["snapshot_date", "stay_date", "lead_days", "hotels_listed", "hotels_vacant", "min_charge"]
 REQUEST_GAP_S = 1.2  # Rakuten throttles repeated requests in short periods
+JST = timezone(timedelta(hours=9))  # Japan has no DST; stay dates are Japanese dates
+
+
+class RakutenError(RuntimeError):
+    """A failed Rakuten request, carrying only the error type / HTTP status.
+
+    requests' own exceptions embed the full request URL — and the
+    credentials are query parameters — so they must never reach the
+    report notes, the console or coverage_report.json.
+    """
 
 
 def _auth() -> dict:
@@ -50,11 +59,19 @@ def _auth() -> dict:
 
 
 def _get(endpoint: str, params: dict) -> dict | None:
-    """None when Rakuten answers 404 not_found (zero matching hotels)."""
-    resp = requests.get(f"{API_BASE}/{endpoint}", params={**_auth(), **params}, timeout=60)
+    """None when Rakuten answers 404 not_found (zero matching hotels).
+
+    Raises RakutenError with no URL in it; `from None` also drops the
+    original exception from the traceback, since it holds the keys.
+    """
+    try:
+        resp = requests.get(f"{API_BASE}/{endpoint}", params={**_auth(), **params}, timeout=60)
+    except requests.RequestException as e:
+        raise RakutenError(f"{endpoint.split('/')[0]}: {type(e).__name__}") from None
     if resp.status_code == 404 and "not_found" in resp.text:
         return None
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RakutenError(f"{endpoint.split('/')[0]}: HTTP {resp.status_code}")
     return resp.json()
 
 
@@ -114,9 +131,11 @@ def load_rakuten(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     geo = {"latitude": node_cfg["coordinates"]["lat"], "longitude": node_cfg["coordinates"]["lon"],
            "searchRadius": radius, "datumType": 1}
 
-    path = Path(resolve_path(f"{SNAPSHOT_DIR}/{node_key}.csv"))
-    snaps = pd.read_csv(path) if path.exists() else pd.DataFrame(columns=SNAPSHOT_COLS)
-    today = date.today()
+    path = resolve_path(f"{SNAPSHOT_DIR}/{node_key}.csv")
+    snaps = read_csv_if_exists(path)
+    if snaps is None:
+        snaps = pd.DataFrame(columns=SNAPSHOT_COLS)
+    today = datetime.now(JST).date()
     done_today = set(snaps.loc[snaps["snapshot_date"] == today.isoformat(), "lead_days"].astype(int))
 
     notes, new_rows = [], []
@@ -126,21 +145,20 @@ def load_rakuten(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         try:
             listed = count_listed(geo)
         except Exception as e:  # noqa: BLE001 - without the hotel count there's no share to compute
-            notes.append(f"hotel count failed this run, no snapshots taken: {e!r}")
+            notes.append(f"hotel count failed this run, no snapshots taken: {e}")
     for lead in todo if listed is not None else []:
         stay = today + timedelta(days=lead)
         try:
             vacant, charge = count_vacant(geo, stay, r_cfg.get("adult_num", 2))
         except Exception as e:  # noqa: BLE001 - one failed lead shouldn't lose the others
-            notes.append(f"lead {lead}d snapshot failed this run: {e!r}")
+            notes.append(f"lead {lead}d snapshot failed this run: {e}")
             continue
         new_rows.append({"snapshot_date": today.isoformat(), "stay_date": stay.isoformat(), "lead_days": lead,
                          "hotels_listed": listed, "hotels_vacant": vacant, "min_charge": charge})
 
     if new_rows:
         snaps = pd.concat([snaps, pd.DataFrame(new_rows)], ignore_index=True) if len(snaps) else pd.DataFrame(new_rows)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        snaps.to_csv(path, index=False)
+        write_csv(snaps, path)
 
     if snaps.empty:
         return None, SourceReport(source="rakuten", node_key=node_key, status="error",

@@ -23,7 +23,7 @@ that nobody walked past — those days become missing, not 0.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
@@ -54,7 +54,7 @@ def load_toyama_camera(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRepor
     for gate in gates:
         prefix = f"{gate['name']}_" if multi_gate else ""
         params = {"search": 1, "mode": "day", "camera_id": gate["camera_id"],
-                  "date_from": cam_cfg.get("start_date", "2023-02-28"), "date_to": date.today().isoformat()}
+                  "date_from": cam_cfg.get("start_date", "2023-02-28"), "date_to": datetime.now(timezone(timedelta(hours=9))).date().isoformat()}
         try:
             raw, note = fetch_csv(EXPORT_URL, f"toyama_camera_{gate['camera_id']}", params=params,
                                   encoding="utf-8-sig", skiprows=2)

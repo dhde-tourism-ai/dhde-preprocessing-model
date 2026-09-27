@@ -207,6 +207,12 @@ config block.
   0. A day only gets a desk total when every desk has a value. Toyama
   cameras are kept as separate columns per camera, never summed (one
   person can pass both). Spending answers stay as yen-range text.
+- **Date range of the master table.** Sources are outer-joined on
+  `date`, so a node's table spans every source: it starts 2021-01-01
+  when `monthly_visitors` is on, and runs up to 30 days ahead for
+  Rakuten stay dates (as the Fukui `hotel` source already runs ahead).
+  Other columns are empty in those rows. Nothing is trimmed here —
+  choosing the modeling window is a modeling-stage decision.
 - **Optional sources.** `info_desk`, `monthly_visitors` and `rakuten` are skipped
   for nodes whose config doesn't declare them, so Fukui output is
   unchanged.

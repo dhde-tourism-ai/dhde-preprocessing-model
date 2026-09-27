@@ -1,6 +1,10 @@
 import pytest
 
-from dhde_preprocessing.config import get_workspace_root, list_configured_nodes, load_node_config, resolve_path
+import pandas as pd
+
+from dhde_preprocessing.config import (
+    get_workspace_root, list_configured_nodes, load_node_config, read_csv_if_exists, resolve_path, write_csv,
+)
 
 
 def test_workspace_root_env_override(monkeypatch):
@@ -40,3 +44,10 @@ def test_load_node_config_mismatched_key_raises(tmp_path):
 def test_load_node_config_missing_file_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_node_config("nonexistent_node", config_dir=tmp_path)
+
+
+def test_csv_helpers_take_plain_strings_and_create_local_dirs(tmp_path):
+    path = f"{tmp_path}/new_dir/snapshots.csv"
+    assert read_csv_if_exists(path) is None
+    write_csv(pd.DataFrame({"a": [1, 2]}), path)
+    assert read_csv_if_exists(path)["a"].tolist() == [1, 2]
