@@ -20,6 +20,7 @@ from .validation import SourceReport, print_report
 from .sources.camera import load_camera
 from .sources.footfall_proxy import load_footfall_proxy
 from .sources.hotel import load_hotel
+from .sources.road_congestion import load_road_congestion
 from .sources.rsi import load_rsi
 from .sources.survey import load_survey
 from .sources.traffic import load_traffic
@@ -32,6 +33,7 @@ SOURCE_LOADERS = {
     "rsi": load_rsi,
     "hotel": load_hotel,
     "traffic": load_traffic,
+    "road_congestion": load_road_congestion,  # TomTom, congestion ratio for every node
     "footfall_proxy": load_footfall_proxy,  # camera-less nodes only, see module docstring
     "visitor_reservation": load_visitor_reservation,  # attraction entry bookings, where a feed exists
     # survey is handled separately below — it's response-level, not date-unique

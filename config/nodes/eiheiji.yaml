@@ -53,3 +53,7 @@ sources:
   footfall_proxy:
     enabled: true  # no camera here: nearest camera + pooled nearby survey volume
     radii_km: [5, 15]  # 30km would reach Fukui Station, a city hub: too different to stand in
+
+  road_congestion:
+    enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
+    radius_km: 2

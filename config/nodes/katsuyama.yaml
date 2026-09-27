@@ -59,3 +59,7 @@ sources:
     # Dinosaur Museum advance entry bookings, daily since 2023-09. Reserved
     # entries only (~57% of reported FY2025 visitors), see module docstring.
     repo: dinosaur-opendata
+
+  road_congestion:
+    enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
+    radius_km: 2

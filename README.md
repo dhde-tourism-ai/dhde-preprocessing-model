@@ -23,7 +23,8 @@ range, calendar gaps, null rates) and writes to `output/`:
 - `{node}_coverage_report.json` — the same coverage info as machine-readable JSON
 
 What's missing per node, and what's used instead, is tracked in
-[`docs/data_gaps.md`](docs/data_gaps.md).
+[`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in
+[`docs/site_capacity.md`](docs/site_capacity.md).
 
 ## The template pattern
 
@@ -47,6 +48,7 @@ existing node's YAML, adjust:
 | `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API on both layers and check the distance before assuming (see caveat below), not just because a node exists. Optional `layer` picks the permanent-counter layer instead of the default CCTV one. |
 | `footfall_proxy` | Optional, only for nodes with **no camera**: `enabled: true` and `radii_km` (default `[5, 15]`). Adds `proxy_camera_count` (nearest other node's Person.csv camera inside the first circle that has one) and `proxy_survey_count` (responses pooled across all survey areas inside the first circle that has any). Labelled proxies, never merged into real camera counts; see `sources/footfall_proxy.py`. |
 | `visitor_reservation` | Optional, only where an attraction publishes entry bookings: `enabled: true` and `repo` (currently `dinosaur-opendata` for Katsuyama). Adds `reserved_visitors` / `reserved_fee` from the visit-day snapshot. Reserved entries only, not total visitors; see `sources/visitor_reservation.py`. |
+| `road_congestion` | `enabled: true` and `radius_km` (default 2). Live TomTom Orbis traffic-flow tiles; needs the `TOMTOM_API_KEY` environment variable (free tier, no card). Adds `road_congestion` (1 - mean relative speed of roads within the radius) plus relative-speed columns. Snapshots are cached under `{workspace_root}/tomtom_cache/`, so history only builds up if the pipeline runs on a schedule; see `sources/road_congestion.py`. |
 
 Every source function has the signature `load_x(node_cfg) -> (df | None, SourceReport)`. If you add a 7th source
 type later, follow that same signature and register it in

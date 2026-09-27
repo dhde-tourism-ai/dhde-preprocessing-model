@@ -7,17 +7,17 @@ reviewable instead of living only in coverage reports. Last checked
 
 ## Coverage summary
 
-| Node | Camera | Weather | RSI | Hotel | Survey | Traffic |
-|---|---|---|---|---|---|---|
-| Tojinbo | Yes | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No |
-| Fukui Station | Yes | Yes | Partial (prefecture total) | Own feed | Yes | CCTV, 2.7km |
-| Katsuyama | No (museum bookings + proxy) | Yes | Yes | Regional | Yes | Permanent, 5.3km |
-| Rainbow Line | Vehicles only | Yes | Yes | Own feed (from 2025-06) | Yes | CCTV, 5km |
-| Awara Onsen | No (proxy) | Yes | Yes | Own feed | Yes | No |
-| Eiheiji | No (proxy) | Partial (12km) | Yes | Regional | Yes | Permanent, 2.5km |
-| Mikuni Port | No (proxy) | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No |
-| Ono Castle Town | No (proxy) | Yes | Yes | Regional | Yes | Permanent, 3.9km |
-| Maruoka Castle | No (proxy) | Partial (no humidity/sun) | Partial (Sakai City 2026 only) | Regional | Yes | CCTV, 1.3km |
+| Node | Camera | Weather | RSI | Hotel | Survey | Traffic | Road congestion |
+|---|---|---|---|---|---|---|---|
+| Tojinbo | Yes | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No | TomTom |
+| Fukui Station | Yes | Yes | Partial (prefecture total) | Own feed | Yes | CCTV, 2.7km | TomTom |
+| Katsuyama | No (museum bookings + proxy) | Yes | Yes | Regional | Yes | Permanent, 5.3km | TomTom |
+| Rainbow Line | Vehicles only | Yes | Yes | Own feed (from 2025-06) | Yes | CCTV, 5km | TomTom |
+| Awara Onsen | No (proxy) | Yes | Yes | Own feed | Yes | No | TomTom |
+| Eiheiji | No (proxy) | Partial (12km) | Yes | Regional | Yes | Permanent, 2.5km | TomTom |
+| Mikuni Port | No (proxy) | Yes | Partial (Sakai City 2026 only) | Regional | Yes | No | TomTom |
+| Ono Castle Town | No (proxy) | Yes | Yes | Regional | Yes | Permanent, 3.9km | TomTom |
+| Maruoka Castle | No (proxy) | Partial (no humidity/sun) | Partial (Sakai City 2026 only) | Regional | Yes | CCTV, 1.3km | TomTom |
 
 "Regional" = code4fukui/echizen-coast-kanko-reservation, used where no
 area-specific reservation feed exists.
@@ -89,21 +89,28 @@ area-specific reservation feed exists.
   baseline, not a daily signal:
   https://www.mlit.go.jp/road/census/r3/ and
   https://www.pref.fukui.lg.jp/doc/douken/census/r3census.html
-- **The dashboard needs congestion, not counts.** Two free options:
-  - **TomTom Traffic Flow API (being tested):** current vs free-flow road
-    speed, free tier 2,500 requests/day with no card. Each response has a
-    `confidence` value showing how much is live probe data; the test checks
-    it on the Tojinbo, Awara and Mikuni roads, plus TomTom's storage terms.
-  - **JARTIC volume vs typical volume** at the six nodes with a counter:
-    free and storable.
+- **The dashboard needs congestion, not counts.** Now covered for all nine
+  nodes by the `road_congestion` source (TomTom Orbis traffic-flow tiles,
+  free tier, no card; key in `TOMTOM_API_KEY`). Each road segment within
+  2km gives relative speed (current / free-flow); `road_congestion` =
+  1 - mean relative speed per day.
+  - TomTom's older Flow Segment Data API has no data anywhere in Japan
+    (even central Tokyo); only the Orbis tiles do.
+  - Tiles give no confidence value, so rural reliability is unverified.
+    First live snapshot (2026-09-27): Eiheiji and Rainbow Line read exactly
+    free-flow (1.00), which may be real or a fallback to typical speeds.
+    Cross-check against JARTIC at the six nodes that have both.
+  - Live only: history builds only if the pipeline runs on a schedule.
+  - **Open:** TomTom's terms on caching/storing data have not been
+    verified yet (page only renders in a browser); check before relying on
+    stored history in production.
 - **Not used:** Google Maps (Routes API). Even its free allowance needs a
   billing account with a card, and its terms restrict storing results.
 
-### Weather (JMA ETRN)
-- **Eiheiji** uses Fukui station (~12km). The closer Miyama station
-  records precipitation only.
-- **Maruoka** uses Harue (~4.7km), which has no humidity or sunshine.
-- **Tojinbo** Mikuni station moved in 2009, now ~4km away.
+## Site capacity
+No site publishes a visitor capacity. Official visitor counts, parking and
+other limits found so far, with sources and what's still missing, are in
+[`site_capacity.md`](site_capacity.md).
 
 ## Dropped for now
 - **Kanazawa Spillover:** Ishikawa Prefecture, so no code4fukui dataset
