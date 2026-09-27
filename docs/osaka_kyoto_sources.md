@@ -2,8 +2,10 @@
 
 Sources suggested for adding Osaka and Kyoto nodes, checked 2026-09-27:
 what each link really contains, and whether it can feed a daily node
-table the way the Fukui, Ishikawa and Toyama sources do. No Osaka or
-Kyoto node exists yet; this is the groundwork for deciding which to add.
+table the way the Fukui, Ishikawa and Toyama sources do. The Osaka and
+Kyoto nodes are now configured with the existing sources below (see the
+README's Kyoto and Osaka section); this file is the record of what else was
+checked.
 
 ## Summary
 

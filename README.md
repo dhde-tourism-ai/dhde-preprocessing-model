@@ -274,6 +274,36 @@ change). Fukui nodes can opt in with the same config block.
   2023-11-22 → 2023-12-19; the Kanazawa desk's one zero day is
   2024-01-02, the day after the earthquake.
 
+## Kyoto and Osaka nodes
+
+Kyoto: `kyoto_station`, `arashiyama`, `fushimi_inari`, `higashiyama`.
+Osaka: `osaka_station`, `namba`, `osaka_castle`, `usj`. Same config layout
+as the Fukui nodes, and the same rule as Ishikawa and Toyama: only data
+that really exists for the prefecture, never another prefecture's.
+
+| Source | Kyoto and Osaka |
+|---|---|
+| weather | all eight: 京都 (`prec_no: "61"`, block 47759) and 大阪 (`"62"`, 47772), the nearest full-observation stations (1–8km) |
+| traffic | six, 0.5–5.3km, each node on its own point (see below); namba and osaka_castle off (their nearest counters read 0 on 84–87 of the last 91 days) |
+| monthly_visitors | all eight, by ward (japan-kanko-stat has wards, not the whole cities) |
+| rakuten | all eight, 1km radius |
+| camera, rsi, hotel, survey | none: no open equivalent found, see [`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md) |
+
+- **Rakuten radius is 1km, not 3km.** The sites are 2–4km apart, so 3km
+  circles would overlap and count the same hotels at several nodes.
+- **No two nodes share a traffic point.** The closest CCTV point to
+  Fushimi Inari and Higashiyama is Kyoto Station's (6810060), so those two
+  use their next-nearest point instead of copying Kyoto Station's signal.
+- **Namba and Osaka Castle share a ward** (中央区, 27128), so their
+  `city_visitors_month` values are the same: it's the ward's total, not
+  each site's.
+- **No daily visitor count yet.** These nodes have no camera or booking
+  count to predict; Rakuten availability is the closest daily demand
+  signal, and it only has history from its first daily run.
+- **Integrated tables:** `python scripts/build_integrated.py --region kyoto`
+  (or `osaka`) writes `integrated_kyoto*.parquet`, with the same columns as
+  Fukui's.
+
 ## Why survey is handled differently from the other five sources
 
 The other five sources are naturally one-row-per-day. Survey responses

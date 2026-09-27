@@ -57,7 +57,12 @@ import pandas as pd
 
 from .config import load_node_config
 
-FUKUI_NODES = ["fukui_station", "tojinbo", "katsuyama", "rainbow_line", "awara_onsen", "eiheiji"]
+REGIONS = {
+    "fukui": ["fukui_station", "tojinbo", "katsuyama", "rainbow_line", "awara_onsen", "eiheiji"],
+    "kyoto": ["kyoto_station", "arashiyama", "fushimi_inari", "higashiyama"],
+    "osaka": ["osaka_station", "namba", "osaka_castle", "usj"],
+}
+FUKUI_NODES = REGIONS["fukui"]
 DEFAULT_START = "2024-12-01"  # weather start_date in every Fukui config; hotel feeds start within days
 
 # Column prefix per source. Columns that already carry a source's own
@@ -77,13 +82,14 @@ SOURCE_PREFIX = {
 }
 FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope", "weather_station"]
 
-# The table always has exactly these columns, in this order, so its shape
-# doesn't change when a source fails on one run or starts producing data
-# (road_* stays empty until the TomTom collector has history). An expected
-# column with no data at all is a warning in the report, not a missing column.
+# The table always has exactly these columns, in this order, for every
+# region, so its shape doesn't change when a source fails on one run or
+# starts producing data (road_* stays empty until the TomTom collector has
+# history), and Fukui, Kyoto and Osaka tables line up. An expected column
+# with no data at all is a warning in the report, not a missing column.
 EXPECTED_COLUMNS = FRONT_COLUMNS + [
-    "has_camera", "has_footfall_proxy", "has_hotel", "has_road_congestion", "has_rsi",
-    "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
+    "has_camera", "has_footfall_proxy", "has_hotel", "has_monthly_visitors", "has_rakuten",
+    "has_road_congestion", "has_rsi", "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
     "camera_count", "camera_gate1_vehicle_count", "camera_gate2_vehicle_count",
     "weather_precip", "weather_temp", "weather_wind", "weather_sun", "weather_humidity", "weather_snow_depth",
     "rsi_level", "rsi_map_views", "rsi_search_views", "rsi_directions", "rsi_call_clicks", "rsi_website_clicks",
@@ -100,6 +106,9 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "proxy_camera_count", "proxy_survey_count",
     "attraction_reserved_visitors", "attraction_reserved_fee",
     "attraction_from_earlier_snapshot", "attraction_bookings_final",
+    "city_visitors_month", "pref_visitors_month",
+    "rakuten_vacant_share_d1", "rakuten_min_charge_d1", "rakuten_vacant_share_d7", "rakuten_min_charge_d7",
+    "rakuten_vacant_share_d30", "rakuten_min_charge_d30",
 ]
 
 SURVEY_COUNT = "survey_response_count"
