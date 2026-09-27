@@ -32,7 +32,7 @@ import math
 import pandas as pd
 
 from ..config import list_configured_nodes, load_node_config, resolve_path
-from ..validation import SourceReport, unavailable_report, validate_daily
+from ..validation import SourceReport, blank_zero_days, unavailable_report, validate_daily
 from .camera import _load_count_csv
 
 DEFAULT_RADII_KM = [5, 15]
@@ -83,7 +83,9 @@ def _camera_proxy(node_cfg, all_cfgs, radii_km, notes):
         return None
     dist, key, path, radius = found
     notes.append(f"proxy_camera_count: {key} camera, {dist:.1f}km away ({radius}km circle)")
-    return _load_count_csv(resolve_path(path), "proxy_camera_count")
+    df = _load_count_csv(resolve_path(path), "proxy_camera_count")
+    df, _ = blank_zero_days(df, "proxy_camera_count", ["proxy_camera_count"])  # sensor down, see camera.py
+    return df
 
 
 def _survey_proxy(node_cfg, radii_km, notes):

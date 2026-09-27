@@ -111,3 +111,50 @@ def test_disabled_camera_returns_unavailable():
     df, report = camera.load_camera(node_cfg)
     assert df is None
     assert report.status == "unavailable"
+
+
+def test_repeated_export_days_keep_last_row_only(patch_resolve_path):
+    """The real exports repeat 2025-09-24 → 09-30 in every sensor file;
+    before this, join.py's outer merge turned each repeated day into
+    several rows (4 per day at Rainbow Line: plates x face)."""
+    tmp_path = patch_resolve_path
+    _write_person_csv(tmp_path / "person.csv", [
+        ["x", "Person", "2025-09-29 00:00:00", "2025-09-30 00:00:00", 2456],
+        ["x", "Person", "2025-09-30 00:00:00", "2025-10-01 00:00:00", 7881],
+        ["x", "Person", "2025-09-29 00:00:00", "2025-09-30 00:00:00", 2464],  # revised re-export
+    ])
+    _write_face_csv(tmp_path / "face.csv", [
+        ["x", "Face", "2025-09-29 00:00:00", "2025-09-30 00:00:00", 5, 1, 2],
+        ["x", "Face", "2025-09-29 00:00:00", "2025-09-30 00:00:00", 5, 1, 2],
+    ])
+    node_cfg = {"node_key": "tojinbo", "sources": {"camera": {"enabled": True, "gates": [
+        {"name": "tojinbo", "person_csv": "person.csv", "face_csv": "face.csv"},
+    ]}}}
+    df, report = camera.load_camera(node_cfg)
+    assert df["date"].is_unique
+    assert df.set_index("date").loc[pd.Timestamp("2025-09-29"), "count"] == 2464
+
+
+def test_person_sensor_zero_is_missing_vehicle_zero_is_kept(patch_resolve_path):
+    tmp_path = patch_resolve_path
+    _write_person_csv(tmp_path / "person.csv", [
+        ["x", "Person", "2025-09-25 00:00:00", "2025-09-26 00:00:00", 7201],
+        ["x", "Person", "2025-09-26 00:00:00", "2025-09-27 00:00:00", 0],
+    ])
+    _write_face_csv(tmp_path / "face.csv", [
+        ["x", "Face", "2025-09-26 00:00:00", "2025-09-27 00:00:00", 0, 0, 0],
+    ])
+    df, report = camera.load_camera({"node_key": "tojinbo", "sources": {"camera": {"enabled": True, "gates": [
+        {"name": "tojinbo", "person_csv": "person.csv", "face_csv": "face.csv"},
+    ]}}})
+    day = df.set_index("date").loc[pd.Timestamp("2025-09-26")]
+    assert pd.isna(day["count"]) and pd.isna(day["face_male_range00to05"])
+    assert any("sensor down" in n for n in report.notes)
+
+    _write_person_csv(tmp_path / "plates.csv", [
+        ["y", "LicensePlate", "2025-09-26 00:00:00", "2025-09-27 00:00:00", 0],
+    ])
+    df, _ = camera.load_camera({"node_key": "rainbow_line", "sources": {"camera": {"enabled": True, "gates": [
+        {"name": "gate2", "license_plate_csv": "plates.csv"},
+    ]}}})
+    assert df.loc[0, "vehicle_count"] == 0

@@ -22,6 +22,13 @@ range, calendar gaps, null rates) and writes to `output/`:
 - `{node}_survey_responses.parquet` — raw response-level survey rows (see "Why survey is different" below)
 - `{node}_coverage_report.json` — the same coverage info as machine-readable JSON
 
+For model training, `python scripts/build_integrated.py` stacks the six
+Fukui nodes' master tables into one table (`output/integrated_fukui_train.parquet`,
+plus `integrated_fukui.parquet` with future bookings for the dashboard):
+same columns for every node, one row per node per day, cleaned of the
+things that would bias a model (leaked future rows, mixed RSI levels,
+missing read as zero). Columns and rules: [`docs/integrated_dataset.md`](docs/integrated_dataset.md).
+
 What's missing per node, and what's used instead, is tracked in
 [`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in
 [`docs/site_capacity.md`](docs/site_capacity.md).

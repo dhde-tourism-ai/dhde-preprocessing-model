@@ -63,3 +63,31 @@ def test_disabled_rsi_returns_unavailable():
     df, report = rsi.load_rsi(node_cfg)
     assert df is None
     assert report.status == "unavailable"
+
+
+def test_rsi_level_says_where_each_value_comes_from(patch_resolve_path):
+    tmp_path = patch_resolve_path
+    (tmp_path / "trend/2025").mkdir(parents=True)
+    _write_metrics_csv(tmp_path / "trend/2025/total_daily_metrics.csv", ["2025-01-01", "2025-01-02"], [999, 998])
+    _write_metrics_csv(tmp_path / "trend/2025/area_坂井市_abcd_daily_metrics.csv", ["2025-01-02"], [50])
+    df, _ = rsi.load_rsi({"node_key": "tojinbo", "sources": {"rsi": {
+        "enabled": True, "repo": "trend", "area_name": "坂井市"}}})
+    assert list(df["rsi_level"]) == ["prefecture", "area"]
+
+
+def test_zero_days_before_tracking_starts_are_missing(patch_resolve_path):
+    """永平寺町's file reads 0 on every metric until 2026-06-05: not tracked
+    yet, not zero searches. Those days fall back to the total instead."""
+    tmp_path = patch_resolve_path
+    (tmp_path / "trend/2026").mkdir(parents=True)
+    _write_metrics_csv(tmp_path / "trend/2026/total_daily_metrics.csv",
+                       ["2026-06-03", "2026-06-04", "2026-06-05"], [0, 500, 600])
+    _write_metrics_csv(tmp_path / "trend/2026/area_永平寺町_abcd_daily_metrics.csv",
+                       ["2026-06-03", "2026-06-04", "2026-06-05"], [0, 0, 7])
+    df, _ = rsi.load_rsi({"node_key": "eiheiji", "sources": {"rsi": {
+        "enabled": True, "repo": "trend", "area_name": "永平寺町"}}})
+    df = df.set_index("date")
+    assert pd.isna(df.loc[pd.Timestamp("2026-06-03"), "directions"])  # neither file tracked yet
+    assert df.loc[pd.Timestamp("2026-06-04"), "directions"] == 500
+    assert df.loc[pd.Timestamp("2026-06-04"), "rsi_level"] == "prefecture"
+    assert df.loc[pd.Timestamp("2026-06-05"), "rsi_level"] == "area"
