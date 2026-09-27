@@ -73,3 +73,28 @@ def test_forecast_covers_the_next_seven_days_with_a_range():
     # the synthetic data has a clear day-off effect, which last week's value copies badly
     best = scores.loc[scores.groupby("node_key")["wape"].idxmin(), "model"]
     assert (best != "baseline").all()
+
+
+def test_visitor_factor_uses_the_daily_mean_so_sensor_gaps_dont_inflate_it():
+    from dhde_preprocessing.forecast import calibration
+    dates = pd.date_range("2025-01-01", "2025-12-31")
+    y = pd.Series(100.0, index=dates)
+    y.iloc[:40] = np.nan  # a 40-day outage
+    info = calibration(y, {"official_visitors": {"year": 2025, "count": 73_000}})
+    assert info["status"] == "ok" and np.isclose(info["factor"], 73_000 / (100 * 365))  # 2.0, not 73k / (325 * 100)
+
+
+def test_no_official_figure_or_too_few_days_means_no_visitor_conversion():
+    from dhde_preprocessing.forecast import calibration
+    y = pd.Series(100.0, index=pd.date_range("2025-01-01", periods=200))
+    assert calibration(y, {"official_visitors": {"year": 2025, "count": None}})["factor"] is None
+    short = calibration(y, {"official_visitors": {"year": 2025, "count": 50_000}})
+    assert short["factor"] is None and "too few" in short["status"]
+
+
+def test_forecast_reports_visitors_next_to_the_measured_count():
+    fc, _, report = forecast(_table(), weeks=4)
+    row = fc[fc["node_key"] == "tojinbo"].iloc[0]
+    factor = report["calibration"]["tojinbo"]["factor"]
+    assert factor and np.isclose(row["visitors_est"], round(row["predicted"] * factor), atol=1)
+    assert row["visitors_low"] <= row["visitors_est"] <= row["visitors_high"]

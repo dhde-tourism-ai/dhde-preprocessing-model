@@ -44,8 +44,11 @@ def main() -> None:
     print(wide.round(3).to_string())
     print("\nShare of later backtest days inside the low/high range fitted on earlier weeks:")
     print(scores.pivot(index="node_key", columns="model", values="coverage_holdout").round(2).to_string())
+    print("\nModel used, and the factor converting its count into visitors:")
     for node_key, model in report["chosen_model"].items():
-        print(f"  {node_key}: {model}")
+        c = report["calibration"][node_key]
+        conv = f"x {c['factor']}" if c["factor"] else f"none ({c['status']})"
+        print(f"  {node_key}: {model}, visitors = count {conv}")
     for node_key, reason in PENDING.items():
         print(f"  {node_key}: pending ({reason})")
     write_forecast(fc, scores, report, output_dir=args.output_dir)

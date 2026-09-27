@@ -4,6 +4,14 @@ coordinates:
   lat: 36.0764
   lon: 136.5011  # approx., かつやま恐竜の森 area (Fukui Prefectural Dinosaur Museum)
 
+# Official annual visitors (観光客入込数, gross visits), used to convert a
+# forecast's measured count into visitors. See docs/site_capacity.md.
+official_visitors:
+  year: 2025
+  count: 1562000
+  source: "https://www.pref.fukui.lg.jp/doc/kankou/fukuiken-kankoukyakusu_d/fil/024.pdf"
+  note: "Katsuyama area figure; the museum alone reported 1.30M for FY2025 (Apr-Mar)"
+
 sources:
   camera:
     enabled: false

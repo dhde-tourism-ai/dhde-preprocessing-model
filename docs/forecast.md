@@ -7,10 +7,12 @@ Code: `src/dhde_preprocessing/forecast.py`.
 
 Outputs, in `output/`:
 
-- `forecast_fukui.parquet` / `.csv`: one row per node per forecast day
-  (`date`, `node_key`, `target`, `model`, `predicted`, `low`, `high`,
-  `backtest_wape`, `baseline_wape`, `range_coverage`, `issued_from` =
-  last observed day).
+- `forecast_fukui.parquet` / `.csv`: one row per node per forecast day:
+  `visitors_est`, `visitors_low`, `visitors_high` (the forecast in
+  visitors, see below), `predicted`, `low`, `high` (the same in the node's
+  own measured count), `calibration_factor`, `model`, `target`,
+  `backtest_wape`, `baseline_wape`, `range_coverage`, `issued_from` (last
+  observed day).
 - `forecast_fukui_backtest.csv`: backtest scores per node and model.
 - `forecast_fukui_report.json`: the same scores, the model chosen per node,
   and the pending nodes with the reason.
@@ -28,6 +30,40 @@ Outputs, in `output/`:
 
 A node without a real count isn't forecast: there would be nothing to
 check the forecast against.
+
+## From measured count to visitors
+
+The model forecasts what each node actually measures, since that's what
+it can be checked against. Every forecast is then also given in one common
+unit, visitors:
+
+    visitors = measured count x factor
+    factor   = official 2025 visitors / (mean daily count in 2025 x 365)
+
+The official counts are Fukui Prefecture's 観光客入込数 2025 (gross visits),
+stored per node as `official_visitors` in `config/nodes/*.yaml` with their
+source (see also `site_capacity.md`). The factor uses the daily *mean*, not
+the sum, so days a sensor was down don't inflate it, and it needs 300+
+measured days.
+
+| Node | Official 2025 | Factor | Reads as |
+|---|---|---|---|
+| Tojinbo | 651k | 0.198 | ~5 camera detections per visitor |
+| Rainbow Line | 443k | 6.98 | ~7 visitors per car counted |
+| Katsuyama | 1,562k (area) | 2.05 | ~2 area visitors per museum booking |
+| Awara Onsen | 658k | 1.86 | ~1.9 visitors per hotel guest |
+| Fukui Station | none | none | No official site figure, so the forecast stays in camera detections |
+
+What this does and doesn't do: it makes each node's yearly total match the
+official figure, so nodes can be compared in one unit. The day-to-day
+pattern is still the node's own count (overnight guests at Awara, cars at
+Rainbow Line), and an official "visit" is a gross count (one person at two
+sites counts twice). Error percentages are the same in either unit.
+Katsuyama uses the area figure (the museum alone reported 1.30M for
+FY2025, April to March); whether the area or the museum figure fits better
+is open. The app's `build_real_data.py` scales its history with the sum
+instead of the mean, which gives slightly higher factors where sensors were
+down (Tojinbo 0.208, Rainbow Line 7.12).
 
 ## Models
 

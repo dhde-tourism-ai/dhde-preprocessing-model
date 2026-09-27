@@ -34,6 +34,16 @@ model is always tested on dates it has never seen, later than its
 training dates. All models are scored on the same days (a day one model
 can't forecast is dropped for all). WAPE = sum |error| / sum actual.
 
+**Visitors.** Each node's count is a different thing (camera detections,
+cars, bookings, hotel guests), so the forecast is also converted to one
+unit, visitors: `visitors_* = count * factor`, where factor = the node's
+official annual visitors (config `official_visitors`) / (mean daily count
+that year * days in the year). The mean, not the sum, so days a sensor was
+down don't inflate the factor; it needs 300+ measured days. It makes the
+yearly total match the official figure; the day-to-day pattern is still the
+node's own count. No official figure (Fukui Station) means no conversion.
+Error percentages (WAPE) are the same in either unit.
+
 **Range.** low/high = the 5th/95th percentile of the backtest's log
 errors, per node and model (see INTERVAL). Its honest coverage is measured by fitting
 those percentiles on the earlier half of the backtest weeks and counting
@@ -51,7 +61,10 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
 
+from .config import load_node_config
+
 HORIZON = 7
+MIN_CALIBRATION_DAYS = 300
 MIN_LAG = 7  # >= HORIZON, so no feature ever needs a day after the forecast is made
 BACKTEST_WEEKS = 26
 # 5th/95th percentile of past errors. A 10/90 band only caught 58-77% of
@@ -268,6 +281,25 @@ def score(bt: pd.DataFrame) -> pd.DataFrame:
     return bt.groupby(["node_key", "model"]).apply(one, include_groups=False).reset_index()
 
 
+def calibration(y: pd.Series, node_cfg: dict) -> dict:
+    """Factor converting a node's measured count into visitors (see module docstring)."""
+    off = node_cfg.get("official_visitors") or {}
+    year, count = off.get("year"), off.get("count")
+    info = {"official_year": year, "official_visitors": count, "source": off.get("source"),
+            "factor": None, "measured_days": 0, "status": "no official figure"}
+    if not year or not count:
+        return info
+    in_year = y[(y.index.year == year)].dropna()
+    info["measured_days"] = int(len(in_year))
+    if len(in_year) < MIN_CALIBRATION_DAYS or in_year.mean() <= 0:
+        info["status"] = f"too few measured days in {year} ({len(in_year)} < {MIN_CALIBRATION_DAYS})"
+        return info
+    days = 366 if pd.Timestamp(year=year, month=12, day=31).dayofyear == 366 else 365
+    info["factor"] = round(count / (in_year.mean() * days), 6)
+    info["status"] = "ok"
+    return info
+
+
 def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
              full: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """Returns (forecast rows, backtest scores, report).
@@ -282,18 +314,23 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
     baseline = scores[scores["model"] == "baseline"].set_index("node_key")
 
     train = _trainable(feats)
-    out = []
+    out, calib = [], {}
     for node_key, row in best.iterrows():
         nf = feats[feats["node_key"] == node_key]
         origin = nf.loc[nf["y"].notna(), "date"].max()
         future = nf[(nf["date"] > origin) & (nf["date"] <= origin + pd.Timedelta(days=HORIZON))]
         pred = MODELS[row["model"]](train, future)
+        low = np.expm1(np.log1p(pred) + row["log_err_low"]).clip(min=0)
+        high = np.expm1(np.log1p(pred) + row["log_err_high"])
+        calib[node_key] = calibration(nf.set_index("date")["y"], load_node_config(node_key))
+        factor = calib[node_key]["factor"]
+        to_visitors = (lambda v: np.round(v * factor)) if factor else (lambda v: np.full(len(v), np.nan))
         out.append(pd.DataFrame({
             "date": future["date"].to_numpy(), "node_key": node_key, "issued_from": origin,
             "target": TARGETS[node_key][1], "model": row["model"],
-            "predicted": np.round(pred),
-            "low": np.round(np.expm1(np.log1p(pred) + row["log_err_low"]).clip(min=0)),
-            "high": np.round(np.expm1(np.log1p(pred) + row["log_err_high"])),
+            "visitors_est": to_visitors(pred), "visitors_low": to_visitors(low), "visitors_high": to_visitors(high),
+            "calibration_factor": factor,
+            "predicted": np.round(pred), "low": np.round(low), "high": np.round(high),
             "backtest_wape": round(row["wape"], 4),
             "baseline_wape": round(baseline.loc[node_key, "wape"], 4),
             "range_coverage": round(row["coverage_holdout"], 3),
@@ -302,6 +339,7 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
     report = {
         "backtest_weeks": weeks, "horizon_days": HORIZON, "interval": list(INTERVAL),
         "chosen_model": best["model"].to_dict(),
+        "calibration": calib,
         "pending": PENDING,
         "scores": json.loads(scores.round(4).to_json(orient="records")),
     }
