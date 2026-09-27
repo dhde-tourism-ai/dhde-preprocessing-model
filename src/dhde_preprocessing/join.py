@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import load_node_config
+from .config import get_workspace_root, load_node_config
 from .validation import SourceReport, print_report
 from .sources.camera import load_camera
 from .sources.footfall_proxy import load_footfall_proxy
@@ -54,6 +54,22 @@ OPTIONAL_SOURCES = {"info_desk", "monthly_visitors", "rakuten",
                     "road_congestion", "footfall_proxy", "visitor_reservation"}
 
 
+def _run_loader(source_name: str, loader, node_cfg: dict):
+    """Run one source loader; a missing data repo becomes that source's
+    error report with a fix hint, instead of a traceback that stops the
+    whole build."""
+    try:
+        return loader(node_cfg)
+    except FileNotFoundError as e:
+        missing = getattr(e, "filename", None) or str(e)
+        return None, SourceReport(
+            source=source_name, node_key=node_cfg["node_key"], status="error",
+            notes=[f"data file not found: {missing}",
+                   f"data repos are read from {get_workspace_root()}; run "
+                   f"`python scripts/fetch_data.py` to clone them there, or set "
+                   f"DHDE_WORKSPACE_ROOT to where they already are"])
+
+
 def build_node_table(node_key: str) -> tuple[pd.DataFrame, pd.DataFrame | None, list[SourceReport]]:
     """Returns (master_daily_table, raw_survey_responses_or_None, reports)."""
     node_cfg = load_node_config(node_key)
@@ -64,13 +80,13 @@ def build_node_table(node_key: str) -> tuple[pd.DataFrame, pd.DataFrame | None, 
     for source_name, loader in SOURCE_LOADERS.items():
         if source_name in OPTIONAL_SOURCES and source_name not in node_cfg["sources"]:
             continue
-        df, report = loader(node_cfg)
+        df, report = _run_loader(source_name, loader, node_cfg)
         reports.append(report)
         print_report(report)
         if df is not None:
             master = df if master is None else pd.merge(master, df, on="date", how="outer")
 
-    survey_df, survey_report = load_survey(node_cfg)
+    survey_df, survey_report = _run_loader("survey", load_survey, node_cfg)
     reports.append(survey_report)
     print_report(survey_report)
     if survey_df is not None:
