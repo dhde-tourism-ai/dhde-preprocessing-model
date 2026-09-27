@@ -40,6 +40,11 @@ same columns for every node, one row per node per day, cleaned of the
 things that would bias a model (leaked future rows, mixed RSI levels,
 missing read as zero). Columns and rules: [`docs/integrated_dataset.md`](docs/integrated_dataset.md).
 
+Then `python scripts/build_forecast.py` forecasts visitors 1 to 7 days
+ahead per node with a low/high range (`output/forecast_fukui.parquet`),
+backtested on the last 26 weeks against "same weekday last week". What's
+forecast, how it's tested and the current scores: [`docs/forecast.md`](docs/forecast.md).
+
 What's missing per node, and what's used instead, is tracked in
 [`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in
 [`docs/site_capacity.md`](docs/site_capacity.md).

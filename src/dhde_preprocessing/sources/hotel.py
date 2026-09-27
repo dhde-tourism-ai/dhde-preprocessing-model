@@ -278,7 +278,7 @@ def _run_pipeline(raw: pd.DataFrame, hotels: pd.DataFrame, P: dict) -> tuple[pd.
 # ── Public interface ─────────────────────────────────────────────────────
 
 MASTER_COLS = [
-    "n_room", "n_people", "amount_fee", "n_stay", "n_reserve", "capacity",
+    "n_room", "n_people", "amount_fee", "n_stay", "n_reserve", "capacity", "n_people_lead7",
     "occ", "adr", "revpar", "rev_per_guest",
     "is_stale", "from_bad_snapshot", "was_imputed", "neg_fee_adjustment", "n_reserve_reliable",
 ]
@@ -314,6 +314,19 @@ def load_hotel(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         .sort_values("date_visit").reset_index(drop=True)
         .rename(columns={"date_visit": "date"})
     )
+    # Guests already booked a week ahead: n_people as read in the snapshot with
+    # the smallest lead_time of at least 7. Taken from the raw snapshots (type
+    # and range checks only), NOT the cleaned curve: glitch detection and gap
+    # filling look at later snapshots, which a forecast made 7 days ahead
+    # couldn't have seen. (Checked on Awara Onsen: the two agree on 99.5% of
+    # days, so this costs nothing.) Empty when no snapshot 7+ days out exists.
+    basic = _step_basic(raw, params)
+    week_ahead = (
+        basic[(basic["lead_time"] >= 7) & basic["n_people"].notna()]
+        .sort_values("lead_time").groupby("date_visit", as_index=False).first()
+        [["date_visit", "n_people"]].rename(columns={"date_visit": "date", "n_people": "n_people_lead7"})
+    )
+    final_daily = final_daily.merge(week_ahead, on="date", how="left")
 
     notes = [
         f"regional source: {hotel_cfg['repo']}" if hotel_cfg.get("scope") == "regional" else f"station-specific source: {hotel_cfg['repo']}",

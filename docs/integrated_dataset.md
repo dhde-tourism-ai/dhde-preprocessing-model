@@ -37,7 +37,7 @@ Outputs, in `output/`:
 
 ## Columns
 
-The table always has the same 67 columns, in the same order
+The table always has the same 69 columns, in the same order
 (`EXPECTED_COLUMNS` in `integrate.py`), even when a source fails on a run
 or has no data yet. An expected column with no data at all is listed
 under `warnings` in `integrated_fukui_report.json` (today: the `road_*`
@@ -63,12 +63,12 @@ until it's added to `EXPECTED_COLUMNS`.
 | `camera_` | People-flow cameras | `camera_count` (people); `camera_gate1_vehicle_count`, `camera_gate2_vehicle_count` (cars, Rainbow Line) | Fukui Station, Tojinbo, Rainbow Line |
 | `weather_` | JMA hourly, daily means (`precip` is the daily sum) | `weather_precip`, `weather_temp`, `weather_wind`, `weather_sun`, `weather_humidity`, `weather_snow_depth` | All |
 | `rsi_` | Google Maps / search intent | `rsi_map_views`, `rsi_search_views`, `rsi_directions`, … and `rsi_level` (`area` or `prefecture`) | All (Tojinbo 2026 only, Eiheiji from 2026-06) |
-| `hotel_` | Reservation feeds, cleaned | `hotel_occ`, `hotel_adr`, `hotel_revpar`, `hotel_n_room`, … and flags `hotel_was_imputed`, `hotel_is_stale`, … | All (Rainbow Line from 2025-06) |
+| `hotel_` | Reservation feeds, cleaned | `hotel_occ`, `hotel_adr`, `hotel_revpar`, `hotel_n_room`, `hotel_n_people_lead7` (guests booked as of 7+ days before), … and flags `hotel_was_imputed`, `hotel_is_stale`, … | All (Rainbow Line from 2025-06) |
 | `traffic_` | JARTIC road counter | `traffic_volume_total`, `traffic_hours_observed` | Fukui Station, Katsuyama, Rainbow Line, Eiheiji (last ~90 days only) |
 | `road_` | TomTom road congestion | `road_congestion` (1 - mean relative speed), `road_relative_speed_mean`, `road_relative_speed_min`, `road_snapshots` | All six, once the collector has history (empty today) |
 | `survey_` | Visitor survey responses | `survey_response_count` | All |
 | `proxy_` | Stand-ins for nodes without a camera | `proxy_camera_count` (Tojinbo's camera, for Awara Onsen), `proxy_survey_count` | Awara Onsen, Eiheiji, Katsuyama |
-| `attraction_` | Dinosaur Museum advance bookings | `attraction_reserved_visitors` (~57% of all visitors) | Katsuyama |
+| `attraction_` | Dinosaur Museum advance bookings | `attraction_reserved_visitors` (~57% of all visitors), `attraction_reserved_visitors_lead7` (booked as of 7 days before; 0 on closing days) | Katsuyama |
 
 ## Not in this table
 

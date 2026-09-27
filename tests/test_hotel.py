@@ -128,3 +128,17 @@ def test_end_to_end_load_hotel_with_tiny_synthetic_repo(patch_resolve_path):
     # 2024-01-02 appears in both snapshots; day-of (lead_time=0, from the
     # 2024-01-02 file) must win over the lead_time=1 row from 2024-01-01's file.
     assert df.loc[pd.Timestamp("2024-01-02"), "n_room"] == 7
+
+
+def test_week_ahead_guests_come_from_a_snapshot_at_least_7_days_early(patch_resolve_path):
+    """n_people_lead7 feeds the forecast, so it must never use a snapshot
+    taken less than 7 days before the stay."""
+    tmp_path = patch_resolve_path
+    row = lambda people: [["2024-01-10", 2, people, 10, 100000, 2]]
+    repo = _write_repo(tmp_path, {"2024-01-01": row(20), "2024-01-03": row(30), "2024-01-08": row(50),
+                                  "2024-01-10": row(60)}, [[100, "2020-01-01"]])
+    df, _ = hotel.load_hotel({"node_key": "awara_onsen", "sources": {"hotel": {
+        "enabled": True, "repo": repo.name, "scope": "area-specific"}}})
+    day = df.set_index("date").loc[pd.Timestamp("2024-01-10")]
+    assert day["n_people"] == 60        # visit day
+    assert day["n_people_lead7"] == 30  # 2024-01-03 (lead 7): not 01-08 (lead 2), not 01-01 (lead 9)
