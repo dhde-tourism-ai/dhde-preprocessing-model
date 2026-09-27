@@ -3,11 +3,19 @@ Monthly visitor counts per city and prefecture — the one demand signal
 measured the same way everywhere in Japan, so it's what makes Fukui,
 Ishikawa and Toyama nodes directly comparable.
 
-Source: code4fukui/japan-kanko-stat, data/all.csv (month YYYYMM, lgcode,
-n), built daily from the Japan Tourism Agency's digital tourism
-statistics open data. One row per month per prefecture (2-digit lgcode,
-e.g. 17 = Ishikawa) or city (5-digit, e.g. 17201 = Kanazawa), from
-2021-01.
+Source: the Japan Tourism Agency's digital tourism statistics open data,
+read straight from the publisher's page (OFFICIAL_PAGE): one CSV per year
+for closed years, one per month for the current year, each split into
+prefecture (2-digit lgcode, e.g. 17 = Ishikawa) and city (5-digit, e.g.
+17201 = Kanazawa) files, from 2021-01.
+
+Why not code4fukui/japan-kanko-stat, which mirrors the same files: its
+downloader never re-fetches a file it already has. On 2026-04-14 the
+publisher re-issued 2025 and Jan–Feb 2026 after prefectures revised their
+tourism points, so the mirror holds pre-revision figures up to 2026-02
+and revised ones from 2026-03 — a fake 2-6x jump for many Fukui towns
+(Fukui city Feb 2026: 57,569 in the mirror, 186,829 revised). Reading
+the publisher's files every run picks up any future revision too.
 
 The master table is daily, so each month's figure is repeated on every
 day of that month in columns named `*_visitors_month` — the value is the
@@ -19,10 +27,68 @@ config get it (see join.OPTIONAL_SOURCES).
 """
 from __future__ import annotations
 
-import pandas as pd
+import re
+from functools import lru_cache
 
-from ..config import resolve_path
+import pandas as pd
+import requests
+
+from ..config import read_csv_if_exists, resolve_path, write_csv
 from ..validation import SourceReport, unavailable_report, validate_daily
+from .remote_csv import CACHE_DIR, fetch_csv
+
+OFFICIAL_PAGE = "https://www.nihon-kankou.or.jp/home/jigyou/research/d-toukei/"
+# e.g. https://d2eveo6c5xeu3l.cloudfront.net/city/city2025.csv, .../pref/pref202608.csv
+CSV_LINK_RE = re.compile(r'href="(https://[^"]+/(?:city|pref)/((?:city|pref)\d{4}(?:\d{2})?)\.csv)"')
+FILE_LIST_CACHE = f"{CACHE_DIR}/kanko_stat_files.csv"
+
+
+def list_official_csvs() -> tuple[list[tuple[str, str]], str]:
+    """[(url, stem)] for every city/pref CSV linked from the publisher's page.
+
+    Falls back to the list cached by the last successful run, so a page
+    outage doesn't blank the source when the files themselves are cached.
+    """
+    try:
+        resp = requests.get(OFFICIAL_PAGE, timeout=60)
+        resp.raise_for_status()
+        files = sorted(set(CSV_LINK_RE.findall(resp.text)), key=lambda f: f[1])
+        if not files:
+            raise ValueError("no city/pref CSV links found on the page")
+    except Exception as e:  # noqa: BLE001 - fall back to the cached list on any failure
+        cached = read_csv_if_exists(resolve_path(FILE_LIST_CACHE))
+        if cached is None:
+            raise
+        return list(cached.itertuples(index=False, name=None)), f"file list: page fetch failed ({e!r}), used cached list"
+    write_csv(pd.DataFrame(files, columns=["url", "stem"]), resolve_path(FILE_LIST_CACHE))
+    return files, f"file list: {len(files)} CSVs linked from {OFFICIAL_PAGE}"
+
+
+@lru_cache(maxsize=1)
+def load_official_table() -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """All publisher files as one (month YYYYMM, lgcode, n) table.
+
+    Cached per process: every node reads the same national table, so it is
+    downloaded once per build, not once per node.
+    """
+    files, list_note = list_official_csvs()
+    frames, notes = [], [list_note]
+    for url, stem in files:
+        # The publisher's CSVs are Shift_JIS (cp932), not UTF-8.
+        df, note = fetch_csv(url, f"kanko_stat_{stem}", encoding="cp932")
+        if not note.startswith("fetched live"):
+            notes.append(f"{stem}: {note}")
+        frames.append(df[["年", "月", "地域コード", "人数"]])
+    raw = pd.concat(frames, ignore_index=True)
+    table = pd.DataFrame({
+        "month": raw["年"].astype(int) * 100 + raw["月"].astype(int),
+        "lgcode": raw["地域コード"].astype(int),
+        "n": pd.to_numeric(raw["人数"], errors="coerce"),
+    }).dropna(subset=["n"])
+    # Files are read oldest first, so if a month ever appears in both a
+    # yearly and a monthly file, the later-published one wins.
+    table = table.drop_duplicates(["month", "lgcode"], keep="last").sort_values(["lgcode", "month"])
+    return table.reset_index(drop=True), tuple(notes)
 
 
 def expand_to_days(monthly: pd.DataFrame, value_col: str) -> pd.DataFrame:
@@ -39,13 +105,17 @@ def load_monthly_visitors(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRe
     if not m_cfg.get("enabled"):
         return None, unavailable_report("monthly_visitors", node_key, m_cfg.get("reason", "monthly visitors disabled for this node"))
 
-    stats = pd.read_csv(f"{resolve_path(m_cfg['repo'])}/data/all.csv")
-    frames, notes = [], []
+    try:
+        stats, fetch_notes = load_official_table()
+    except Exception as e:  # noqa: BLE001 - a live fetch failure must not crash the whole run
+        return None, SourceReport(source="monthly_visitors", node_key=node_key, status="error",
+                                  notes=[f"official digital tourism statistics fetch failed: {e!r}"])
+    frames, notes = [], list(fetch_notes)
     for level in ("city", "pref"):
         code = m_cfg[f"{level}_lgcode"]
         rows = stats[stats["lgcode"] == code].sort_values("month")
         if rows.empty:
-            notes.append(f"lgcode {code} ({level}) not found in {m_cfg['repo']}/data/all.csv")
+            notes.append(f"lgcode {code} ({level}) not found in the official digital tourism statistics")
             continue
         frames.append(expand_to_days(rows, f"{level}_visitors_month"))
         notes.append(f"{level} lgcode {code}: {rows['month'].min()}–{rows['month'].max()}")

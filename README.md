@@ -215,12 +215,17 @@ prefecture's data as a stand-in:
 | rsi, hotel | none | none |
 
 **`monthly_visitors` is the cross-prefecture comparison signal.** It
-comes from code4fukui/japan-kanko-stat (JTA digital tourism statistics):
+comes from the JTA digital tourism statistics, downloaded from the
+publisher's page on every build (cached under `open_data_cache/`):
 monthly visitor counts per city and prefecture, measured the same way
 across Japan, from 2021-01. Each month's total is repeated on every day
 of that month (`city_visitors_month`, `pref_visitors_month`). Fukui
-nodes can opt in with the same 5 config lines (Fukui pref lgcode 18,
-e.g. Fukui city 18201, Sakai 18210). Survey counts are **not** comparable
+nodes can opt in with the same 4 config lines (Fukui pref lgcode 18,
+e.g. Fukui city 18201, Sakai 18210). It no longer reads
+code4fukui/japan-kanko-stat: that mirror never re-downloads a file, so it
+kept pre-revision figures up to 2026-02 after the publisher revised 2025
+and Jan–Feb 2026 on 2026-04-14, which showed as a fake 2-6x jump for many
+Fukui towns from 2026-03. Survey counts are **not** comparable
 across prefectures — each prefecture runs its own questionnaire and
 poster placement — so compare survey trends within a prefecture only.
 
@@ -240,12 +245,13 @@ checkout of that branch to build with them. It needs the
 Rakuten app must not be locked to one IP address (Actions runners
 change). Fukui nodes can opt in with the same config block.
 
-- **Where the data comes from.** Sibling repos, like the Fukui sources:
-  `ishikawa-kanko-survey` and `japan-kanko-stat` (both code4fukui). Over
-  HTTP, via `sources/remote_csv.py` (cached under
+- **Where the data comes from.** A sibling repo, like the Fukui sources:
+  `ishikawa-kanko-survey` (code4fukui). Over HTTP, via
+  `sources/remote_csv.py` (cached under
   `{workspace_root}/open_data_cache/`, falls back to the cache if a
   fetch fails): Milli's facility list and tourist desk Google Sheets,
-  TOYTOS from Toyama's CKAN portal, Toyama City's camera CSV export.
+  TOYTOS from Toyama's CKAN portal, Toyama City's camera CSV export, and
+  the JTA digital tourism statistics for `monthly_visitors`.
 - **Milli survey rows carry a facility, not a municipality.** The
   municipality comes from Milli's facility list, joined on (area,
   facility); ~1% name a facility missing from the list and are dropped

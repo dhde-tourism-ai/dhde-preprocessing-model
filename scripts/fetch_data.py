@@ -35,7 +35,6 @@ GITHUB_ORG = "https://github.com/code4fukui"
 SPARSE_FILES = {
     "fukui-kanko-survey": ["all.csv", "area.csv"],
     "ishikawa-kanko-survey": ["all.csv"],
-    "japan-kanko-stat": ["data/all.csv"],
 }
 
 
