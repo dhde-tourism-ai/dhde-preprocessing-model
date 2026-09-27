@@ -1,16 +1,20 @@
 """
 Road traffic volume ingestion — JARTIC open traffic data (via MLIT's
-xROAD portal), CCTV AI-counter layer (t_travospublic_measure_1h_img).
+xROAD portal): CCTV AI-counter layer (t_travospublic_measure_1h_img)
+by default, or the permanent-counter layer (t_travospublic_measure_1h).
 
 This replaces the old FY2005 static road census as the traffic signal,
 where a nearby monitoring point actually exists — coverage is
 national-roads-only and sparse (~2,600 points nationwide), confirmed
 empirically per node rather than assumed (see config notes below):
 
-  - Tojinbo:      nearest point ~14km away  -> unavailable (config: enabled=false)
-  - Katsuyama:    nearest point ~22.5km away -> unavailable (config: enabled=false)
-  - Fukui Station: point 6810150, ~2.7km away -> included, flagged
-  - Rainbow Line:  point 6810590, ~5km away   -> included, flagged
+  - CCTV layer (default): Fukui Station 6810150 (~2.7km), Rainbow Line
+    6810590 (~5km), Maruoka Castle 6810140 (~1.3km)
+  - Permanent layer (`layer: t_travospublic_measure_1h` in config):
+    Eiheiji 6110870 (~2.5km), Ono 6110840 (~3.9km), Katsuyama 6110860
+    (~5.3km)
+  - Tojinbo, Awara Onsen, Mikuni Port: nearest point on either layer is
+    8km+ away -> unavailable (config: enabled=false)
 
 "Flagged" means: this module does NOT verify the point sits on the road
 visitors actually use to reach the site, only that a point exists in the
@@ -36,11 +40,15 @@ import requests
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 API_BASE = "https://api.jartic-open-traffic.org/geoserver"
-LAYER = "t_travospublic_measure_1h_img"  # CCTV AI counter, hourly — the layer with coverage at these 2 nodes
+LAYER = "t_travospublic_measure_1h_img"  # CCTV AI counter, hourly — default layer
+# Permanent (loop-detector) counters, hourly. Same property names as the CCTV
+# layer, different point set — closer than any CCTV point for some nodes
+# (Eiheiji, Ono, Katsuyama). Selected per node via `layer:` in its config.
+PERMANENT_LAYER = "t_travospublic_measure_1h"
 DEFAULT_WINDOW_DAYS = 90
 
 
-def _query_point_range(point_code: int, start: datetime, end: datetime) -> list[dict]:
+def _query_point_range(point_code: int, start: datetime, end: datetime, layer: str = LAYER) -> list[dict]:
     time_code_geq = start.strftime("%Y%m%d%H00")
     time_code_leq = end.strftime("%Y%m%d%H00")
     # No quotes around the field name here — the spec document's own
@@ -53,7 +61,7 @@ def _query_point_range(point_code: int, start: datetime, end: datetime) -> list[
     )
     params = {
         "service": "WFS", "version": "2.0.0", "request": "GetFeature",
-        "typeNames": LAYER, "srsName": "EPSG:4326",
+        "typeNames": layer, "srsName": "EPSG:4326",
         "outputFormat": "application/json", "exceptions": "application/json",
         "cql_filter": cql,
     }
@@ -71,12 +79,13 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     point_code = t_cfg["point_code"]
     distance_km = t_cfg.get("distance_km")
     window_days = t_cfg.get("window_days", DEFAULT_WINDOW_DAYS)
+    layer = t_cfg.get("layer", LAYER)
 
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=window_days)
 
     try:
-        features = _query_point_range(point_code, start, end)
+        features = _query_point_range(point_code, start, end, layer)
     except requests.RequestException as e:
         return None, SourceReport(source="traffic", node_key=node_key, status="error",
                                    notes=[f"JARTIC API request failed: {e!r}"])
@@ -106,7 +115,7 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     ).reset_index().rename(columns={"datetime": "date"})
 
     notes = [
-        f"point_code={point_code}, ~{distance_km}km from node coordinates — "
+        f"point_code={point_code} (layer {layer}), ~{distance_km}km from node coordinates — "
         f"NOT confirmed to be on the site's actual access road, see module docstring",
         f"live API pull, {window_days}-day trailing window only — no historical backfill available",
     ]

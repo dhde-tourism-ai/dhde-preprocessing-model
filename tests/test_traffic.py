@@ -71,3 +71,19 @@ def test_aggregates_hourly_features_to_daily_volume(monkeypatch):
     assert day1["hours_observed"] == 2
     day2 = df.loc["2024-01-02"]
     assert day2["volume_total"] == 15
+
+
+def test_layer_is_configurable_and_defaults_to_cctv(monkeypatch):
+    # Permanent counters live on a different JARTIC layer with the same
+    # property names; the node config picks which one to query.
+    seen = []
+
+    def _get(url, params, timeout):
+        seen.append(params["typeNames"])
+        return _FakeResponse({"features": [_feature("202401010800")]})
+
+    monkeypatch.setattr(traffic.requests, "get", _get)
+    base = {"enabled": True, "point_code": 123, "distance_km": 2.0}
+    traffic.load_traffic({"node_key": "x", "sources": {"traffic": dict(base)}})
+    traffic.load_traffic({"node_key": "x", "sources": {"traffic": dict(base, layer=traffic.PERMANENT_LAYER)}})
+    assert seen == [traffic.LAYER, traffic.PERMANENT_LAYER]

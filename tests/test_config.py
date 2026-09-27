@@ -13,11 +13,13 @@ def test_resolve_path_joins_without_mangling_s3_uri(monkeypatch):
     assert resolve_path("some-repo/data.csv") == "s3://my-bucket/dhde/some-repo/data.csv"
 
 
-def test_list_configured_nodes_finds_all_ten():
+def test_list_configured_nodes_finds_all_nine():
+    # Kanazawa Spillover was dropped for now (Ishikawa, no Fukui-side data) —
+    # see docs/data_gaps.md.
     nodes = list_configured_nodes()
     assert nodes == [
-        "awara_onsen", "eiheiji", "fukui_station", "kanazawa_spillover", "katsuyama",
-        "maruoka_castle", "mikuni_port", "ono_castle_town", "rainbow_line", "tojinbo",
+        "awara_onsen", "eiheiji", "fukui_station", "katsuyama", "maruoka_castle",
+        "mikuni_port", "ono_castle_town", "rainbow_line", "tojinbo",
     ]
 
 

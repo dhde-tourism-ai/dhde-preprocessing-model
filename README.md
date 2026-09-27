@@ -22,6 +22,9 @@ range, calendar gaps, null rates) and writes to `output/`:
 - `{node}_survey_responses.parquet` — raw response-level survey rows (see "Why survey is different" below)
 - `{node}_coverage_report.json` — the same coverage info as machine-readable JSON
 
+What's missing per node, and what's used instead, is tracked in
+[`docs/data_gaps.md`](docs/data_gaps.md).
+
 ## The template pattern
 
 Every node is: **one YAML config + the same six source modules**, nothing
@@ -41,7 +44,7 @@ existing node's YAML, adjust:
 | `rsi` | `repo`, `area_name` (a municipality tracked in code4fukui/fukui-kanko-trend-data's per-year folders) or `null` to use the prefecture-wide total only. |
 | `hotel` | `repo` (use a node-specific reservation repo if one exists, e.g. `fukui-station-kanko-reservation` — falls back to the regional `echizen-coast-kanko-reservation` otherwise) and `scope` (`station-specific` or `regional`, just for the report notes). Price-sanity bounds are derived automatically from whichever repo you point at — see caveat below. |
 | `survey` | `repo`, `area_ids` — the 親番号 (parent number) value(s) from fukui-kanko-survey's `area.csv`, **not** its `id` column (see caveat below). |
-| `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API and check the distance before assuming (see caveat below), not just because a node exists. |
+| `traffic` | `enabled: false` with `reason` unless a JARTIC monitoring point actually exists nearby — query the live API on both layers and check the distance before assuming (see caveat below), not just because a node exists. Optional `layer` picks the permanent-counter layer instead of the default CCTV one. |
 
 Every source function has the signature `load_x(node_cfg) -> (df | None, SourceReport)`. If you add a 7th source
 type later, follow that same signature and register it in
@@ -90,10 +93,13 @@ it isn't naturally one-row-per-day).
   columns plus data-quality flag columns (`is_stale`, `was_imputed`,
   etc.) so nothing is hidden.
 
-  **This repo covers two different hotel datasets, same format, very
-  different price tiers** — `fukui-station-kanko-reservation` (3 hotels
-  near Fukui Station, 585 rooms, used for that node specifically) and
-  `echizen-coast-kanko-reservation` (regional, used for the other 3).
+  **This repo covers several hotel datasets, same format, very
+  different price tiers** — area-specific feeds where one exists
+  (`fukui-station-kanko-reservation`: 3 hotels near Fukui Station, 585
+  rooms; `fukui-kanko-reservation`: Awara Onsen;
+  `mikatagoko-kanko-reservation`: Mikata Five Lakes, used for Rainbow
+  Line) and `echizen-coast-kanko-reservation` (regional, used for every
+  other node).
   The original analysis's price-sanity check used a fixed 3,000–30,000
   JPY/room range, validated against the Fukui Station repo specifically.
   Applied as-is to the regional repo (real median price ~64,500 JPY — a
@@ -132,10 +138,13 @@ it isn't naturally one-row-per-day).
   bug this was actually hit and fixed.
 
 - **JARTIC (road traffic) coverage was checked empirically, not
-  assumed**, by querying the live API with each node's real coordinates:
-  Tojinbo (~14km to nearest point) and Katsuyama (~22.5km) are
-  `enabled: false`. Fukui Station (~2.7km) and Rainbow Line (~5km) are
-  `enabled: true` but flagged — a point exists nearby, but this has
+  assumed**, by querying the live API with each node's real coordinates
+  on **both** JARTIC layers — the CCTV AI counters (default) and the
+  permanent counters (`layer: t_travospublic_measure_1h` in the node
+  config; same property names, different point set). Tojinbo, Awara
+  Onsen and Mikuni Port have no point within 8km on either layer and are
+  `enabled: false`. The other six are `enabled: true` but flagged — a
+  point exists nearby (1.3–5.3km), but this has
   **not** been confirmed to sit on the road visitors actually use to
   reach the site. `distance_km` and `point_code` are carried into every
   build's coverage report so this stays visible. Also: JARTIC only

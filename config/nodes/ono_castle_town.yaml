@@ -38,9 +38,12 @@ sources:
                           # other 大野市 areas (荒島の郷, 九頭竜湖駅, 六呂師高原)
 
   traffic:
-    enabled: false
+    enabled: true
+    layer: t_travospublic_measure_1h  # permanent counter layer, not CCTV
+    point_code: 6110840
+    distance_km: 3.9
     reason: >
-      No CCTV counter within range — nearest (6810150) is ~23.7km away
-      (queried live 2026-09-27). A permanent counter (6110840) sits ~3.9km
-      away, but traffic.py only reads the CCTV layer; enabling it needs a
-      code change, not just config.
+      Included but flagged: permanent counter ~3.9km from the castle town
+      (queried live 2026-09-27; nearest CCTV counter is ~23.7km). NOT
+      confirmed to sit on the road visitors use; verify before treating
+      this as a precise local signal.

@@ -40,9 +40,12 @@ sources:
     area_ids: [300025]  # 大本山 永平寺 エリア (formerly 永平寺門前 エリア)
 
   traffic:
-    enabled: false
+    enabled: true
+    layer: t_travospublic_measure_1h  # permanent counter layer, not CCTV
+    point_code: 6110870
+    distance_km: 2.5
     reason: >
-      No CCTV counter within range — nearest (6810150) is ~10.4km away
-      (queried live 2026-09-27). A permanent counter (6110870) sits ~2.5km
-      away, but traffic.py only reads the CCTV layer; enabling it needs a
-      code change, not just config.
+      Included but flagged: permanent counter ~2.5km from the temple
+      (queried live 2026-09-27; nearest CCTV counter is ~10.4km). NOT
+      confirmed to sit on the road visitors use to reach Eiheiji; verify
+      before treating this as a precise local signal.

@@ -40,7 +40,12 @@ sources:
                           # over pooling all 6 勝山市 area entries. See PR discussion.
 
   traffic:
-    enabled: false
+    enabled: true
+    layer: t_travospublic_measure_1h  # permanent counter layer, not CCTV
+    point_code: 6110860
+    distance_km: 5.3
     reason: >
-      No JARTIC monitoring point within range — nearest point on either
-      layer is ~22.5km away (queried live 2026-09-25).
+      Included but flagged: permanent counter ~5.3km away (queried live
+      2026-09-27). The earlier ~22.5km figure was the CCTV layer only; the
+      permanent layer was not checked then. NOT confirmed to sit on the
+      road to the Dinosaur Museum; verify before relying on it.
