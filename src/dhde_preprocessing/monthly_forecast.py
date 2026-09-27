@@ -35,8 +35,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from ..sources.guest_nights import load_guest_nights
-from ..sources.monthly_visitors import REVISED_FROM, load_official_table
+from .sources.guest_nights import load_guest_nights
+from .sources.monthly_visitors import REVISED_FROM, load_official_table
 
 HORIZON = 12
 GROWTH_MONTHS = 6          # year-on-year growth is averaged over this many recent months

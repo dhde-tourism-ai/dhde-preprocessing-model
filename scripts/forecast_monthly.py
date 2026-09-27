@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 12-month forecast of monthly visitors per Fukui node's municipality and of
-Fukui guest-nights. See src/dhde_preprocessing/forecast/monthly.py.
+Fukui guest-nights. See src/dhde_preprocessing/monthly_forecast.py.
 
 Downloads its two sources itself (no build_node.py run needed) and writes:
     output/monthly_forecast.csv           one row per series per future month
@@ -22,7 +22,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from dhde_preprocessing.forecast.monthly import build_monthly_forecast
+from dhde_preprocessing.monthly_forecast import build_monthly_forecast
 
 
 def main() -> None:

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from dhde_preprocessing.forecast import monthly
+from dhde_preprocessing import monthly_forecast as monthly
 
 
 def _series(start: str, values) -> pd.Series:

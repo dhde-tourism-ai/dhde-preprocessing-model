@@ -3,10 +3,9 @@
 Per-node data preprocessing for the DHDE (Distributed Human Data Engine)
 tourism dashboard covering Fukui/Hokuriku, Japan. This package's job stops
 at: **raw source → cleaned, validated, date-keyed table → one joined
-master table per node.** It does not build 0–100 normalized scores. The
-one forecast it makes is the monthly one (see "Monthly forecast" below);
-the daily forecast is a separate modeling stage that consumes this
-pipeline's output.
+master table per node.** It does not build 0–100 normalized scores. It
+also holds the forecasts that ship in the same daily build: the monthly
+one (see "Monthly forecast" below) and the 7-day one (`docs/forecast.md`).
 
 ## Quickstart
 
@@ -299,7 +298,7 @@ only on months after the forecast origin): the same month last year, or
 that plus half of the recent year-on-year growth, either its own or
 Ishikawa's and Toyama's. `low`/`high` are the 10th–90th percentile of the
 chosen model's backtest errors. Details and thresholds are in
-`src/dhde_preprocessing/forecast/monthly.py`.
+`src/dhde_preprocessing/monthly_forecast.py`.
 
 - **Fukui's visitor counts are only comparable from 2025-01.** The
   publisher's April 2026 tourism-point revision didn't reach back, so
