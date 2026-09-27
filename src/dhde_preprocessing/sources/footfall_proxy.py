@@ -10,7 +10,7 @@ already-real signals from a wider area and labels them as proxies:
 - proxy_camera_count: daily person count from the NEAREST other node's
   camera, searched in widening circles (config `radii_km`, default 5 →
   15km; 30km was tried and reached Fukui Station, a city hub too unlike
-  Katsuyama/Ono to stand in). Only Person.csv sensors qualify — Rainbow Line's
+  Katsuyama to stand in). Only Person.csv sensors qualify — Rainbow Line's
   LicensePlate.csv gates count vehicles, so they're never used as a
   people proxy.
 - proxy_survey_count: daily FTAS survey responses pooled across EVERY

@@ -2,8 +2,8 @@
 Road congestion ingestion — TomTom Orbis traffic-flow vector tiles.
 
 What the dashboard needs from traffic is congestion (how slow roads are
-vs. normal), not vehicle counts. JARTIC gives counts at only six nodes;
-TomTom covers every node, including Tojinbo, Awara Onsen and Mikuni Port.
+vs. normal), not vehicle counts. JARTIC gives counts at only four nodes;
+TomTom covers every node, including Tojinbo and Awara Onsen.
 
 Why Orbis tiles and not TomTom's Flow Segment Data API: that older API
 returns "Point too far from nearest existing segment" for every point in

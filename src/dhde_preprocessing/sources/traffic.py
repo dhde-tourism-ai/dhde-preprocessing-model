@@ -9,12 +9,10 @@ national-roads-only and sparse (~2,600 points nationwide), confirmed
 empirically per node rather than assumed (see config notes below):
 
   - CCTV layer (default): Fukui Station 6810150 (~2.7km), Rainbow Line
-    6810590 (~5km), Maruoka Castle 6810140 (~1.3km)
+    6810590 (~5km)
   - Permanent layer (`layer: t_travospublic_measure_1h` in config):
-    Eiheiji 6110870 (~2.5km), Ono 6110840 (~3.9km), Katsuyama 6110860
-    (~5.3km)
-  - Tojinbo, Awara Onsen, Mikuni Port: nearest point on either layer is
-    8km+ away -> unavailable (config: enabled=false)
+    Eiheiji 6110870 (~2.5km), Katsuyama 6110860 (~5.3km)
+  - Tojinbo, Awara Onsen: nearest point on either layer is 8km+ away -> unavailable (config: enabled=false)
 
 "Flagged" means: this module does NOT verify the point sits on the road
 visitors actually use to reach the site, only that a point exists in the
@@ -43,7 +41,7 @@ API_BASE = "https://api.jartic-open-traffic.org/geoserver"
 LAYER = "t_travospublic_measure_1h_img"  # CCTV AI counter, hourly — default layer
 # Permanent (loop-detector) counters, hourly. Same property names as the CCTV
 # layer, different point set — closer than any CCTV point for some nodes
-# (Eiheiji, Ono, Katsuyama). Selected per node via `layer:` in its config.
+# (Eiheiji, Katsuyama). Selected per node via `layer:` in its config.
 PERMANENT_LAYER = "t_travospublic_measure_1h"
 DEFAULT_WINDOW_DAYS = 90
 

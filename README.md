@@ -145,10 +145,10 @@ it isn't naturally one-row-per-day).
   assumed**, by querying the live API with each node's real coordinates
   on **both** JARTIC layers — the CCTV AI counters (default) and the
   permanent counters (`layer: t_travospublic_measure_1h` in the node
-  config; same property names, different point set). Tojinbo, Awara
-  Onsen and Mikuni Port have no point within 8km on either layer and are
-  `enabled: false`. The other six are `enabled: true` but flagged — a
-  point exists nearby (1.3–5.3km), but this has
+  config; same property names, different point set). Tojinbo and Awara
+  Onsen have no point within 8km on either layer and are
+  `enabled: false`. The other four are `enabled: true` but flagged — a
+  point exists nearby (2.5–5.3km), but this has
   **not** been confirmed to sit on the road visitors actually use to
   reach the site. `distance_km` and `point_code` are carried into every
   build's coverage report so this stays visible. Also: JARTIC only
