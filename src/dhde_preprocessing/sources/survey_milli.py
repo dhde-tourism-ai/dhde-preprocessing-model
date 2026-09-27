@@ -52,6 +52,28 @@ def assign_city(responses: pd.DataFrame, facilities: pd.DataFrame) -> pd.Series:
     return city.fillna(name.map(by_name))
 
 
+def clean_responses(df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """Row-level cleaning; returns (cleaned rows, duplicates dropped).
+
+    Answer fields are left as-is (spending stays as the questionnaire's
+    yen-range text, e.g. "10,000円以上 20,000円未満") — turning them into
+    numbers is a modeling-stage choice, as for Fukui.
+
+    - Two submissions from the same facility in the same second are one
+      person double-submitting (2 are byte-identical, the rest differ
+      only in a field or two), not two visitors — keep the first.
+    - 個人情報保護の方針について is the consent checkbox; every kept row
+      says 同意する, so it carries no information.
+    """
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["タイムスタンプ"], errors="coerce").dt.normalize()
+    df = df.dropna(subset=["date"])
+    n_before = len(df)
+    df = df.drop_duplicates(subset=["エリア", "施設", "タイムスタンプ"], keep="first")
+    df = df.drop(columns=["個人情報保護の方針について"], errors="ignore")
+    return df.sort_values("date").reset_index(drop=True), n_before - len(df)
+
+
 def load_milli_survey(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     node_key = node_cfg["node_key"]
     survey_cfg = node_cfg["sources"]["survey"]
@@ -77,8 +99,9 @@ def load_milli_survey(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport
         return None, SourceReport(source="survey", node_key=node_key, status="error",
                                    notes=notes + ["zero responses matched — check the cities list against 市町 values"])
 
-    df["date"] = pd.to_datetime(df["タイムスタンプ"], errors="coerce").dt.normalize()
-    df = df.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+    df, n_dupes = clean_responses(df)
+    if n_dupes:
+        notes.append(f"{n_dupes} duplicate submission(s) dropped (same facility, same second)")
 
     report = validate_daily(df, source="survey", node_key=node_key, notes=notes)
     return df, report

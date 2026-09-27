@@ -174,6 +174,12 @@ stand-in:
   municipality comes from Milli's separate facility list, joined on
   (エリア, 施設). ~1% of responses name a facility missing from that list
   and are dropped (counted in the report notes).
+- **Cleaning:** survey double submissions (same facility, same second)
+  are dropped, keeping the first, along with the always-"同意する"
+  consent column. A tourist desk day with a total of 0 is treated as
+  missing (the one case is 2024-01-02, the day after the Noto
+  earthquake), and a day only gets a desk total when every desk has a
+  value. Spending answers stay as the questionnaire's yen-range text.
 - **Milli survey counts are not comparable with Fukui's.** They depend
   on how many QR posters each prefecture put up. Compare trends within
   Ishikawa, not levels across prefectures.

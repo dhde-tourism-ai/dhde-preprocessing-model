@@ -69,3 +69,18 @@ def test_ambiguous_name_is_not_matched_on_name_alone():
     })
     responses = pd.DataFrame({"エリア": ["能登エリア"], "施設": ["共通名"]})
     assert survey_milli.assign_city(responses, facilities).isna().all()
+
+
+def test_double_submission_is_dropped_and_consent_column_removed():
+    df = pd.DataFrame({
+        "エリア": ["金沢エリア", "金沢エリア", "金沢エリア"],
+        "施設": ["兼六園", "兼六園", "兼六園"],
+        "タイムスタンプ": ["2024/01/01 10:00:00", "2024/01/01 10:00:00", "2024/01/01 10:00:01"],
+        "個人情報保護の方針について": ["同意する"] * 3,
+        "満足度": ["満足", "とても満足", "満足"],  # double submit that differs in one field
+    })
+    cleaned, n_dupes = survey_milli.clean_responses(df)
+    assert n_dupes == 1
+    assert len(cleaned) == 2
+    assert cleaned.iloc[0]["満足度"] == "満足"  # keeps the first
+    assert "個人情報保護の方針について" not in cleaned.columns

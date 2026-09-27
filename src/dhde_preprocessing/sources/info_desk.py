@@ -22,6 +22,29 @@ from .gsheet import fetch_sheet
 CATEGORY_COLUMNS = {"合計": "info_desk_total", "外国人": "info_desk_foreign"}
 
 
+def clean_desk(raw: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    """One desk's long sheet -> one row per day (date, info_desk_total,
+    info_desk_foreign); returns (that, number of zero-total days blanked).
+
+    A 合計 of 0 means the desk was closed or the day wasn't recorded
+    (Kanazawa Station's median day is ~735), not that nobody came — so
+    both columns are set to missing for that day rather than kept as 0.
+    """
+    raw = raw.copy()
+    raw["属性"] = raw["属性"].astype(str).str.strip()
+    raw = raw[raw["属性"].isin(CATEGORY_COLUMNS)]
+    raw["date"] = pd.to_datetime(raw["日付"], errors="coerce").dt.normalize()
+    raw["count"] = pd.to_numeric(raw["数値"], errors="coerce")
+    wide = (raw.dropna(subset=["date"])
+            .pivot_table(index="date", columns="属性", values="count", aggfunc="sum")
+            .rename(columns=CATEGORY_COLUMNS)
+            .reindex(columns=list(CATEGORY_COLUMNS.values())))
+    zero = wide["info_desk_total"] == 0
+    wide.loc[zero, :] = float("nan")
+    wide.columns.name = None
+    return wide.reset_index(), int(zero.sum())
+
+
 def load_info_desk(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     node_key = node_cfg["node_key"]
     d_cfg = node_cfg["sources"].get("info_desk", {})
@@ -36,20 +59,22 @@ def load_info_desk(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
             notes.append(f"{desk['name']}: fetch failed and no cache: {e!r}")
             continue
         notes.append(f"{desk['name']}: {note}")
-        raw = raw[raw["属性"].astype(str).str.strip().isin(CATEGORY_COLUMNS)]
-        frames.append(pd.DataFrame({
-            "date": pd.to_datetime(raw["日付"], errors="coerce").dt.normalize(),
-            "category": raw["属性"].astype(str).str.strip().map(CATEGORY_COLUMNS),
-            "count": pd.to_numeric(raw["数値"], errors="coerce"),
-        }))
+        one_desk, n_zero = clean_desk(raw)
+        if n_zero:
+            notes.append(f"{desk['name']}: {n_zero} day(s) with a total of 0 treated as missing (closed or not recorded)")
+        frames.append(one_desk)
 
     if not frames:
         return None, SourceReport(source="info_desk", node_key=node_key, status="error", notes=notes)
 
-    long = pd.concat(frames, ignore_index=True).dropna(subset=["date"])
-    daily = (long.pivot_table(index="date", columns="category", values="count", aggfunc="sum")
-             .reindex(columns=list(CATEGORY_COLUMNS.values())).reset_index())
-    daily.columns.name = None
+    # A day only counts when every desk has a value — otherwise the sum
+    # would silently drop to one desk's number and look like a real dip.
+    daily = (pd.concat(frames, ignore_index=True)
+             .groupby("date")[list(CATEGORY_COLUMNS.values())].sum(min_count=len(frames))
+             .reset_index())
+    n_partial = int(daily["info_desk_total"].isna().sum())
+    if n_partial:
+        notes.append(f"{n_partial} day(s) left empty because at least one desk had no value")
 
     report = validate_daily(daily, source="info_desk", node_key=node_key, notes=notes)
     return daily, report

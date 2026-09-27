@@ -74,3 +74,13 @@ def test_gsheet_rejects_non_csv_response(monkeypatch, patch_resolve_path):
     monkeypatch.setattr(gsheet.requests, "get", lambda *a, **k: _Resp())
     with pytest.raises(ValueError):
         gsheet.fetch_sheet("sheet", "y")
+
+
+def test_zero_total_day_becomes_missing_not_zero(monkeypatch):
+    sheets = {"station": _desk([100, 0, 120], [30, 0, 40]), "central": _desk([50, 55, 60], [5, 5, 6])}
+    monkeypatch.setattr(info_desk, "fetch_sheet", lambda sheet_id, cache_name: (sheets[sheet_id], "stub"))
+    df, report = info_desk.load_info_desk(_cfg())
+    # Day 2: station closed -> the whole day is unknown, not 55 (central alone).
+    assert df["info_desk_total"].isna().tolist() == [False, True, False]
+    assert df.loc[[0, 2], "info_desk_total"].tolist() == [150, 180]
+    assert any("1 day(s) with a total of 0" in n for n in report.notes)
