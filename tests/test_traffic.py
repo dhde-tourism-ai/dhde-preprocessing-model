@@ -136,3 +136,33 @@ def test_api_failure_falls_back_to_saved_history(monkeypatch, no_saved_history):
     df, report = traffic.load_traffic(node_cfg)
     assert report.status == "ok" and len(df) == 1
     assert any("saved history only" in n for n in report.notes)
+
+
+def test_merge_history_with_nothing_to_merge_returns_empty():
+    assert traffic.merge_history(pd.DataFrame(columns=["date"]), None).empty
+
+
+@pytest.mark.parametrize("content", ["", "date,volume_total\n"])
+def test_empty_saved_history_file_is_ignored(monkeypatch, no_saved_history, content):
+    d = no_saved_history / traffic.HISTORY_DIR
+    d.mkdir(parents=True)
+    (d / "x_traffic_daily.csv").write_text(content, encoding="utf-8")
+    monkeypatch.setattr(traffic.requests, "get", lambda *a, **k: _FakeResponse({"features": [_feature("202401010800")]}))
+    node_cfg = {"node_key": "x", "sources": {"traffic": {"enabled": True, "point_code": 123, "distance_km": 2.0}}}
+    df, report = traffic.load_traffic(node_cfg)
+    assert report.status == "ok" and len(df) == 1
+
+
+def test_history_path_is_not_mangled_for_s3(monkeypatch):
+    # Path("s3://b/x") collapses to "s3:/b/x"; the loader must pass the string through.
+    seen = []
+
+    def _read(path, **kwargs):
+        seen.append(path)
+        return None
+
+    monkeypatch.setattr(traffic, "resolve_live_path", lambda p: f"s3://bucket/live/{p}")
+    monkeypatch.setattr(traffic, "read_csv_if_exists", _read)
+    monkeypatch.setattr(traffic.requests, "get", lambda *a, **k: _FakeResponse({"features": [_feature("202401010800")]}))
+    traffic.load_traffic({"node_key": "x", "sources": {"traffic": {"enabled": True, "point_code": 1, "distance_km": 1}}})
+    assert seen == ["s3://bucket/live/jartic_history/x_traffic_daily.csv"]

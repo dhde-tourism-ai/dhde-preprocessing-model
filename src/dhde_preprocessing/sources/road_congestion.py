@@ -32,13 +32,12 @@ from __future__ import annotations
 import math
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 import mapbox_vector_tile
 import pandas as pd
 import requests
 
-from ..config import resolve_live_path
+from ..config import read_csv_if_exists, resolve_live_path, write_csv
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 TILE_URL = "https://api.tomtom.com/maps/orbis/traffic/tile/flow/{z}/{x}/{y}.pbf"
@@ -126,8 +125,14 @@ def load_road_congestion(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRep
 
     radius_km = cfg.get("radius_km", DEFAULT_RADIUS_KM)
     zoom = cfg.get("zoom", DEFAULT_ZOOM)
-    cache_path = Path(resolve_live_path(CACHE_DIR)) / f"{node_key}_road_congestion.csv"
-    cache = pd.read_csv(cache_path) if cache_path.exists() else pd.DataFrame(columns=SNAPSHOT_COLS)
+    # A string, not Path(), so an s3:// live-data root works.
+    cache_path = resolve_live_path(f"{CACHE_DIR}/{node_key}_road_congestion.csv")
+    try:
+        cache = read_csv_if_exists(cache_path)
+    except pd.errors.EmptyDataError:  # 0-byte file
+        cache = None
+    if cache is None:
+        cache = pd.DataFrame(columns=SNAPSHOT_COLS)
     notes = [f"TomTom Orbis flow tiles, segments within {radius_km}km, zoom {zoom}; "
              f"no per-segment confidence (rural reliability unverified)"]
 
@@ -150,8 +155,7 @@ def load_road_congestion(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRep
                 notes.append(f"no road segments within {radius_km}km in this snapshot")
             new = pd.DataFrame([snap], columns=SNAPSHOT_COLS)
             cache = new if cache.empty else pd.concat([cache, new], ignore_index=True)
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache.to_csv(cache_path, index=False)
+            write_csv(cache, cache_path)
 
     usable = cache.dropna(subset=["relative_speed_mean"])
     if usable.empty:

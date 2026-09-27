@@ -95,3 +95,25 @@ def test_request_error_does_not_leak_the_key(env, monkeypatch):
     monkeypatch.setattr(rc.requests, "get", _boom)
     _, report = rc.load_road_congestion(_cfg())
     assert not any("test-key" in n for n in report.notes)
+
+
+def test_cache_path_is_not_mangled_for_s3(monkeypatch):
+    seen = []
+
+    def _read(path, **kwargs):
+        seen.append(path)
+        return None
+
+    monkeypatch.setattr(rc, "resolve_live_path", lambda p: f"s3://bucket/live/{p}")
+    monkeypatch.setattr(rc, "read_csv_if_exists", _read)
+    monkeypatch.delenv(rc.KEY_ENV, raising=False)
+    rc.load_road_congestion(_cfg())
+    assert seen == ["s3://bucket/live/tomtom_cache/n_road_congestion.csv"]
+
+
+def test_empty_cache_file_is_ignored(env, monkeypatch):
+    (env / rc.CACHE_DIR).mkdir()
+    (env / rc.CACHE_DIR / "n_road_congestion.csv").write_text("", encoding="utf-8")
+    monkeypatch.delenv(rc.KEY_ENV)
+    df, report = rc.load_road_congestion(_cfg())
+    assert df is None and report.status == "unavailable"

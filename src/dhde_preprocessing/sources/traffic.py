@@ -30,13 +30,12 @@ won't hold it.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from urllib.parse import quote
 
 import pandas as pd
 import requests
 
-from ..config import resolve_live_path
+from ..config import read_csv_if_exists, resolve_live_path
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 API_BASE = "https://api.jartic-open-traffic.org/geoserver"
@@ -52,7 +51,10 @@ HISTORY_DIR = "jartic_history"  # written by scripts/collect_live.py
 def merge_history(existing: pd.DataFrame | None, new: pd.DataFrame | None) -> pd.DataFrame:
     """Merge daily rows by date; the newer pull wins for dates in both
     (the most recent day is partial until the next pull completes it)."""
-    both = pd.concat([d for d in (existing, new) if d is not None and not d.empty], ignore_index=True)
+    frames = [d for d in (existing, new) if d is not None and not d.empty]
+    if not frames:  # e.g. a saved history file with only a header row
+        return pd.DataFrame(columns=["date"])
+    both = pd.concat(frames, ignore_index=True)
     both["date"] = pd.to_datetime(both["date"])
     return both.drop_duplicates("date", keep="last").sort_values("date").reset_index(drop=True)
 
@@ -97,8 +99,15 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         f"point_code={point_code} (layer {layer}), ~{distance_km}km from node coordinates — "
         f"NOT confirmed to be on the site's actual access road, see module docstring",
     ]
-    history_path = Path(resolve_live_path(HISTORY_DIR)) / f"{node_key}_traffic_daily.csv"
-    history = pd.read_csv(history_path) if history_path.exists() else None
+    history_name = f"{node_key}_traffic_daily.csv"
+    # A string, not Path(), so an s3:// live-data root works.
+    history_path = resolve_live_path(f"{HISTORY_DIR}/{history_name}")
+    try:
+        history = read_csv_if_exists(history_path)
+    except pd.errors.EmptyDataError:  # 0-byte file
+        history = None
+    if history is not None and history.empty:
+        history = None
 
     try:
         features = _query_point_range(point_code, start, end, layer)
@@ -113,7 +122,7 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         if history is None:
             return None, SourceReport(source="traffic", node_key=node_key, status="error", notes=notes + [live_error])
         daily = merge_history(history, None)
-        notes += [live_error, f"using saved history only ({len(daily)} days from {history_path.name})"]
+        notes += [live_error, f"using saved history only ({len(daily)} days from {history_name})"]
         return daily, validate_daily(daily, source="traffic", node_key=node_key, notes=notes)
 
     rows = []
@@ -135,7 +144,7 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
 
     if history is not None:
         daily = merge_history(history, daily)
-        notes.append(f"live {window_days}-day pull merged with saved history ({history_path.name})")
+        notes.append(f"live {window_days}-day pull merged with saved history ({history_name})")
     else:
         notes.append(f"live API pull, {window_days}-day trailing window only — no saved history found "
                      f"under {HISTORY_DIR}/ (run scripts/collect_live.py on a schedule)")
