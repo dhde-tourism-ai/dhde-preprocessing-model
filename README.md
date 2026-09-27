@@ -11,9 +11,20 @@ that consumes this pipeline's output.
 
 ```bash
 pip install -r requirements.txt
+python scripts/fetch_data.py          # clone the code4fukui data repos
 python scripts/build_node.py --node tojinbo
 python scripts/build_node.py --all
 ```
+
+**Where the data goes:** the pipeline reads its data repos from
+`DHDE_WORKSPACE_ROOT`, which defaults to the folder *above* this repo. So
+if this repo is at `~/work/dhde-preprocessing-model`, the data repos go in
+`~/work/`. `scripts/fetch_data.py` reads the node configs, clones every
+repo they need there (only the files used, for the big ones), and updates
+them on later runs. If your data repos already live elsewhere, set
+`DHDE_WORKSPACE_ROOT` to that folder instead. A missing repo shows up as
+that source's error in the coverage report, with this hint, instead of
+stopping the build.
 
 Each run prints a per-source coverage report (status, row count, date
 range, calendar gaps, null rates) and writes to `output/`:
