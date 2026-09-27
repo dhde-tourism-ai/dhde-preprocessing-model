@@ -18,6 +18,16 @@ covers, with area-level values used wherever available.
 If a node has no matching municipality at all (e.g. Fukui Station — Fukui
 City isn't a tracked municipality in this dataset), the prefecture-wide
 total is used outright for that node; see area_name: null in its config.
+
+Every row says which level its values come from in `rsi_level` ("area" or
+"prefecture"), so the two are never silently mixed: they differ in scale
+by orders of magnitude.
+
+Each file reads 0 on every metric until tracking starts (e.g. 永平寺町
+until 2026-06-05, the prefecture total until 2024-05-26). Those leading
+zero days mean "not tracked yet", not "nobody searched", so they become
+missing; an area's untracked days then fall back to the total like any
+other missing area day.
 """
 from __future__ import annotations
 
@@ -28,12 +38,22 @@ import pandas as pd
 from ..config import resolve_path
 from ..validation import SourceReport, unavailable_report, validate_daily
 
+ACTIVITY_COLS = ["map_views", "search_views", "directions"]  # all 0 = not tracked yet
+
 RSI_COLS = [
     "map_views", "search_views", "directions", "call_clicks", "website_clicks",
     "average_rating", "review_count_change",
     "review_count_by_rating_1", "review_count_by_rating_2", "review_count_by_rating_3",
     "review_count_by_rating_4", "review_count_by_rating_5",
 ]
+
+
+def _blank_untracked(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    active = df[ACTIVITY_COLS].fillna(0).sum(axis=1) > 0
+    first = df.loc[active, "date"].min()
+    df.loc[~(df["date"] >= first), RSI_COLS] = float("nan")  # every row when never active
+    return df
 
 
 def _year_dirs(repo_root: str) -> list[Path]:
@@ -74,22 +94,26 @@ def load_rsi(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         return None, unavailable_report("rsi", node_key, rsi_cfg.get("reason", "rsi disabled for this node"))
 
     repo_root = resolve_path(rsi_cfg["repo"])
-    total = _load_total(repo_root)[["date", *RSI_COLS]]
+    total = _blank_untracked(_load_total(repo_root)[["date", *RSI_COLS]])
     area_name = rsi_cfg.get("area_name")
 
     notes: list[str] = []
     if not area_name:
         notes.append("no matching municipality file for this node — using prefecture-wide total only")
-        df = total
+        df = total.assign(rsi_level=total["directions"].notna().map({True: "prefecture", False: None}))
     else:
         area_df = _load_area(repo_root, area_name)
         if area_df.empty:
             notes.append(f"area file for '{area_name}' not found — falling back to prefecture-wide total only")
-            df = total
+            df = total.assign(rsi_level=total["directions"].notna().map({True: "prefecture", False: None}))
         else:
             area_cols = {c: f"{c}__area" for c in RSI_COLS}
-            merged = pd.merge(total, area_df[["date", *RSI_COLS]].rename(columns=area_cols), on="date", how="left")
+            area_df = _blank_untracked(area_df[["date", *RSI_COLS]])
+            merged = pd.merge(total, area_df.rename(columns=area_cols), on="date", how="left")
             n_area_rows = merged["directions__area"].notna().sum()
+            merged["rsi_level"] = None
+            merged.loc[merged["directions"].notna(), "rsi_level"] = "prefecture"
+            merged.loc[merged["directions__area"].notna(), "rsi_level"] = "area"
             notes.append(
                 f"area '{area_name}': {n_area_rows}/{len(merged)} days have area-level data, "
                 f"rest filled from prefecture-wide total"

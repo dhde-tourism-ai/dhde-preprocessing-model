@@ -71,8 +71,12 @@ area-specific reservation feed exists.
   Tojinbo's 994 RSI days are town-level; the rest are filled from the
   prefecture-wide total. This predates PR #6.
 - **Fukui City** (Fukui Station) is not tracked; prefecture total only.
-- **Open question:** whether the modelling stage should use filled dates
-  or treat them as missing.
+- **Each row now says its level** (`rsi_level`: `area` or `prefecture`).
+  The integrated training table treats prefecture-filled days as missing
+  for nodes that have a town file (see [`integrated_dataset.md`](integrated_dataset.md)).
+- **Zero days before tracking starts are missing**, not 0: 永平寺町
+  (Eiheiji) reads 0 on every metric until 2026-06-05, so Eiheiji has
+  ~110 days of town-level RSI.
 
 ### Traffic (JARTIC, api.jartic-open-traffic.org)
 - **Missing:** Tojinbo (nearest point ~14km) and Awara Onsen (~8.1km) on

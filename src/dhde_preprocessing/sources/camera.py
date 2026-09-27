@@ -21,13 +21,23 @@ Source: code4fukui/fukui-kanko-people-flow-data, full/{sensor}/*.csv
 There is no directional (in/out) data in this source. Multi-gate nodes
 (Rainbow Line) are NOT merged into one count here; each gate gets its own
 column, decided node-by-node in config (see config/nodes/rainbow_line.yaml).
+
+The exports repeat some days (e.g. 2025-09-24 → 09-30 appears twice in
+every sensor's files, checked 2026-09-27), once with slightly revised
+counts. Only the last row per day is kept; without this, the outer join
+in join.py multiplies those days (4 rows per day at Rainbow Line).
+
+A 0 from a Person.csv sensor means the sensor was down, not that nobody
+came (every Fukui sensor read 0 on 2025-09-26 → 09-28, and Tojinbo reads
+~7,000 on a normal day), so those days become missing. Vehicle gates keep
+their zeros: Rainbow Line's gate 2 really sees no cars on many days.
 """
 from __future__ import annotations
 
 import pandas as pd
 
 from ..config import resolve_path
-from ..validation import SourceReport, unavailable_report, validate_daily
+from ..validation import SourceReport, blank_zero_days, unavailable_report, validate_daily
 from .camera_toyama import load_toyama_camera
 
 FACE_DROP_COLS = {"placement", "object class", "aggregate from", "aggregate to", "total count"}
@@ -39,6 +49,7 @@ def _load_count_csv(path: str, count_col_name: str) -> pd.DataFrame:
     caller names the output column accordingly."""
     df = pd.read_csv(path)
     df["date"] = pd.to_datetime(df["aggregate from"]).dt.normalize()
+    df = df.drop_duplicates("date", keep="last")
     return df[["date", "total count"]].rename(columns={"total count": count_col_name})
 
 
@@ -46,6 +57,7 @@ def _load_face_csv(path: str, prefix: str) -> pd.DataFrame:
     df = pd.read_csv(path)
     keep_cols = [c for c in df.columns if c not in FACE_DROP_COLS]
     df["date"] = pd.to_datetime(df["aggregate from"]).dt.normalize()
+    df = df.drop_duplicates("date", keep="last")
     renamed = {c: f"{prefix}face_{c.replace(' ', '_')}" for c in keep_cols}
     return df[["date", *keep_cols]].rename(columns=renamed)
 
@@ -63,6 +75,7 @@ def load_camera(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     gates = cam_cfg["gates"]
     multi_gate = len(gates) > 1
     merged: pd.DataFrame | None = None
+    notes: list[str] = []
 
     for gate in gates:
         prefix = f"{gate['name']}_" if multi_gate else ""
@@ -81,8 +94,13 @@ def load_camera(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
             face_df = _load_face_csv(face_path, prefix)
             gate_df = pd.merge(gate_df, face_df, on="date", how="left")
 
+        if gate.get("person_csv"):
+            gate_df, n_blanked = blank_zero_days(gate_df, f"{prefix}count", [c for c in gate_df.columns if c != "date"])
+            if n_blanked:
+                notes.append(f"{gate['name']}: {n_blanked} day(s) reading 0 set to missing (sensor down)")
+
         merged = gate_df if merged is None else pd.merge(merged, gate_df, on="date", how="outer")
 
     merged = merged.sort_values("date").reset_index(drop=True)
-    report = validate_daily(merged, source="camera", node_key=node_key)
+    report = validate_daily(merged, source="camera", node_key=node_key, notes=notes)
     return merged, report
