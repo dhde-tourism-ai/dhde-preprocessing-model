@@ -45,6 +45,8 @@ MIN_GROWTH_PAIRS = 3       # growth models need at least this many year-on-year 
 MIN_GAIN_PP = 0.5          # a candidate must beat the baseline MAPE by this much
 MIN_SHARED_CELLS = 24      # ...on at least this many (origin, h) cells every model scored
 MIN_BACKTEST = 12          # fewer backtest forecasts than this: baseline, no range
+MIN_RANGE_MONTHS = 12      # fewer distinct target months than this: the range is flagged rough
+THIN_MARGIN_PP = 1.0       # a growth model winning by less than this gets a note
 INTERVAL = (0.10, 0.90)
 GUEST_NIGHTS_FROM = "2023-01"
 
@@ -114,7 +116,8 @@ def predict(model: str, y: pd.Series, neighbours: list[pd.Series], T: pd.Period,
 
 def backtest(y: pd.Series, neighbours: list[pd.Series]) -> pd.DataFrame:
     """Rolling-origin errors: one row per (model, origin, horizon) that could
-    be scored. `log_error` is log(actual) - log(predicted)."""
+    be scored. `log_error` is log(actual) - log(predicted); `target` is the
+    month forecast (origin + h)."""
     rows = []
     last = y.index.max()
     for T in y.index:
@@ -126,8 +129,8 @@ def backtest(y: pd.Series, neighbours: list[pd.Series]) -> pd.DataFrame:
             for m in MODELS:
                 p = predict(m, y[y.index <= T], nb, T, h)
                 if p is not None:
-                    rows.append((m, str(T), h, y[T + h] - p))
-    bt = pd.DataFrame(rows, columns=["model", "origin", "h", "log_error"])
+                    rows.append((m, str(T), h, str(T + h), y[T + h] - p))
+    bt = pd.DataFrame(rows, columns=["model", "origin", "h", "target", "log_error"])
     bt["ape_pct"] = (np.exp(-bt["log_error"]) - 1).abs() * 100 if not bt.empty else []
     return bt
 
@@ -158,7 +161,12 @@ def forecast_series(y_raw: pd.Series, neighbours_raw: list[pd.Series], comparabl
     """Forecast the next HORIZON months of one series.
 
     Returns {"forecast": DataFrame(month, predicted, low, high),
-             "model", "mape" (per model), "backtest_n", "data_through"}.
+             "model", "mape" (per model), "backtest_n", "range_rough", "data_through"}.
+
+    `backtest_n` counts distinct target months, not (origin, horizon) cells:
+    with the baseline, every origin forecasting the same month makes the same
+    error, so 96 cells can be only 8 independent errors. Below
+    MIN_RANGE_MONTHS the low/high range is flagged rough (`range_rough`).
     """
     start = pd.Period(comparable_from, "M") if comparable_from else None
 
@@ -172,10 +180,12 @@ def forecast_series(y_raw: pd.Series, neighbours_raw: list[pd.Series], comparabl
     neighbours = [prep(n) for n in neighbours_raw]
     bt = backtest(y, neighbours)
     model, mape = choose_model(bt)
-    errors = bt.loc[bt["model"] == model, "log_error"]
-    n = int(len(errors))
-    lo_q, hi_q = (errors.quantile(INTERVAL[0]), errors.quantile(INTERVAL[1])) if n >= MIN_BACKTEST else (np.nan, np.nan)
-    if n < MIN_BACKTEST:
+    chosen = bt[bt["model"] == model]
+    errors = chosen["log_error"]
+    n = int(chosen["target"].nunique())
+    enough = len(errors) >= MIN_BACKTEST
+    lo_q, hi_q = (errors.quantile(INTERVAL[0]), errors.quantile(INTERVAL[1])) if enough else (np.nan, np.nan)
+    if not enough:
         model = BASELINE
 
     T = y.index.max()
@@ -190,7 +200,8 @@ def forecast_series(y_raw: pd.Series, neighbours_raw: list[pd.Series], comparabl
         # entirely above or below its own forecast; widen it to include it.
         rows.append((str(T + h), np.exp(p), np.exp(p + min(lo_q, 0)), np.exp(p + max(hi_q, 0))))
     fc = pd.DataFrame(rows, columns=["month", "predicted", "low", "high"])
-    return {"forecast": fc, "model": model, "mape": mape, "backtest_n": n, "data_through": str(T)}
+    return {"forecast": fc, "model": model, "mape": mape, "backtest_n": n,
+            "range_rough": enough and n < MIN_RANGE_MONTHS, "data_through": str(T)}
 
 
 # ── Assembling the series ─────────────────────────────────────────────────────
@@ -219,15 +230,19 @@ def guest_nights_series(table: pd.DataFrame, pref: int, column: str) -> pd.Serie
 
 def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """(forecast rows, backtest MAPE per series and model, source notes)."""
-    visitors, v_notes = load_official_table()
+    visitors, v_notes = load_official_table()  # (None, notes) if the download failed with no cache
     nights, n_note = load_guest_nights()
     notes = [*v_notes, f"guest-nights: {n_note}",
              "guest-nights: JTA changed its sampling from 2026-01 (stratified by rooms, "
              "not employees); year-on-year changes across that boundary may partly reflect it"]
+    if visitors is None:
+        notes.append("visitors: no visitor statistics this run, every visitor series skipped")
 
     out, scores = [], []
     for spec in series:
         if spec.kind == "visitors":
+            if visitors is None:
+                continue
             y = visitors_series(visitors, spec.codes)
             nb = [visitors_series(visitors, (p,)) for p in NEIGHBOUR_PREFS]
         else:
@@ -238,19 +253,29 @@ def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFr
             continue
         res = forecast_series(y, nb, spec.comparable_from)
         mape = res["mape"]
+        margin = mape.get(BASELINE, np.nan) - mape.get(res["model"], np.nan)
+        if res["model"] != BASELINE and margin < THIN_MARGIN_PP:
+            caveat = (" with Ishikawa's 2024 Noto earthquake stays and JTA's 2026-01 sampling change "
+                      "inside the backtest" if spec.kind == "guest_nights" else "")
+            notes.append(f"{spec.name}: {res['model']} beats the baseline by only {margin:.1f}pp{caveat}; "
+                         "treat the choice as tentative")
+        if res["range_rough"]:
+            notes.append(f"{spec.name}: low/high range is rough, from {res['backtest_n']} distinct months "
+                         f"(fewer than {MIN_RANGE_MONTHS})")
         fc = res["forecast"].assign(
             series=spec.name, kind=spec.kind, label=spec.label, model=res["model"],
             backtest_mape_pct=round(mape.get(res["model"], np.nan), 1),
             baseline_mape_pct=round(mape.get(BASELINE, np.nan), 1),
-            backtest_n=res["backtest_n"], data_through=res["data_through"],
+            backtest_n=res["backtest_n"], range_rough=res["range_rough"], data_through=res["data_through"],
             comparable_from=spec.comparable_from,
         )
         out.append(fc)
         scores.append({"series": spec.name, **{m: round(v, 1) for m, v in mape.items()},
-                       "chosen": res["model"], "backtest_n": res["backtest_n"]})
+                       "chosen": res["model"], "backtest_n": res["backtest_n"], "range_rough": res["range_rough"]})
 
     cols = ["series", "kind", "label", "month", "predicted", "low", "high", "model",
-            "backtest_mape_pct", "baseline_mape_pct", "backtest_n", "data_through", "comparable_from"]
+            "backtest_mape_pct", "baseline_mape_pct", "backtest_n", "range_rough", "data_through",
+            "comparable_from"]
     forecast = pd.concat(out, ignore_index=True)[cols] if out else pd.DataFrame(columns=cols)
     for c in ("predicted", "low", "high"):
         forecast[c] = forecast[c].round(0)

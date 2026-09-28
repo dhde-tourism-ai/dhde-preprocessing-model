@@ -59,6 +59,22 @@ def test_one_year_of_history_gives_baseline_without_a_range():
     assert res["forecast"]["low"].isna().all()
 
 
+def test_backtest_n_counts_distinct_target_months():
+    # 20 months from 2025-01: the baseline can score only 2026-01..08, from many origins.
+    y = _series("2025-01", SEASON + SEASON[:8])
+    res = monthly.forecast_series(y, [])
+    assert res["backtest_n"] == 8
+    assert res["range_rough"]
+
+
+def test_failed_visitor_download_skips_visitor_series(monkeypatch):
+    monkeypatch.setattr(monthly, "load_official_table", lambda: (None, ("visitors fetch failed: offline",)))
+    monkeypatch.setattr(monthly, "load_guest_nights", lambda: (pd.DataFrame(), "test"))
+    forecast, scores, notes = monthly.build_monthly_forecast([monthly.SERIES[0]])
+    assert forecast.empty and scores.empty
+    assert any("every visitor series skipped" in n for n in notes)
+
+
 def test_visitors_series_sums_codes_and_needs_all_of_them():
     table = pd.DataFrame({
         "month": [202501, 202502, 202501, 202502, 202501],
