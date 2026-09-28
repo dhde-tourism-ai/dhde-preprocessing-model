@@ -215,7 +215,7 @@ prefecture's data as a stand-in:
 | rsi, hotel | none | none |
 
 **`monthly_visitors` is the cross-prefecture comparison signal.** It
-comes from the JTA digital tourism statistics, downloaded from the
+comes from the JTTA (日本観光振興協会) digital tourism statistics, downloaded from the
 publisher's page on every build (cached under `open_data_cache/`):
 monthly visitor counts per city and prefecture, measured the same way
 across Japan, from 2021-01. Each month's total is repeated on every day
@@ -251,7 +251,7 @@ change). Fukui nodes can opt in with the same config block.
   `{workspace_root}/open_data_cache/`, falls back to the cache if a
   fetch fails): Milli's facility list and tourist desk Google Sheets,
   TOYTOS from Toyama's CKAN portal, Toyama City's camera CSV export, and
-  the JTA digital tourism statistics for `monthly_visitors`.
+  the JTTA (日本観光振興協会) digital tourism statistics for `monthly_visitors`.
 - **Milli survey rows carry a facility, not a municipality.** The
   municipality comes from Milli's facility list, joined on (area,
   facility); ~1% name a facility missing from the list and are dropped

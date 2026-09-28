@@ -3,7 +3,8 @@ Monthly visitor counts per city and prefecture — the one demand signal
 measured the same way everywhere in Japan, so it's what makes Fukui,
 Ishikawa and Toyama nodes directly comparable.
 
-Source: the Japan Tourism Agency's digital tourism statistics open data,
+Source: the digital tourism statistics open data of the Japan Travel and
+Tourism Association (日本観光振興協会, JTTA; not the Japan Tourism Agency),
 read straight from the publisher's page (OFFICIAL_PAGE): one CSV per year
 for closed years, one per month for the current year, each split into
 prefecture (2-digit lgcode, e.g. 17 = Ishikawa) and city (5-digit, e.g.
