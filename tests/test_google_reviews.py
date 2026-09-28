@@ -121,6 +121,36 @@ def test_a_run_with_no_new_reviews_still_counts_as_zero(live, monkeypatch):
     assert by.loc["2026-10-05", "reviews_new"] == 0 and pd.isna(by.loc["2026-10-05", "reviews_count_total"])
 
 
+def test_a_header_only_log_reads_zero_reviews_not_a_crash(live):
+    """A newly enabled place: runs written, no reviews yet. stars must stay numeric."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import collect_google_reviews as collector
+
+    collector.store(pd.DataFrame(), PLACE, "tojinbo", 300, "2026-09-20", live=True)
+    assert pd.read_csv(live / "google_reviews" / "tojinbo.csv").empty
+    df, report = gr.load_google_reviews(_cfg())
+    assert report.status == "ok"
+    assert df["reviews_new"].eq(0).all() and df["reviews_stars_mean"].isna().all()
+    assert pd.api.types.is_numeric_dtype(df["reviews_stars_mean"])
+
+
+def test_reviews_under_another_place_id_are_not_logged_as_zero(live, capsys):
+    """Google moved the listing: the week must not be marked covered with 0 reviews."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import collect_google_reviews as collector
+
+    moved = _items([("a", "2026-09-25T01:00:00Z", 5, "ja", "x")]).assign(placeId="ChIJmoved")
+    collector.store(moved, PLACE, "tojinbo", 300, "2026-09-20", live=True)
+    assert not (live / "google_reviews" / "tojinbo_runs.csv").exists()
+    assert "ChIJmoved" in capsys.readouterr().out
+
+
 def test_an_import_without_the_place_records_nothing(live):
     import sys
     from pathlib import Path

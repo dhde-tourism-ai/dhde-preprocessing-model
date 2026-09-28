@@ -183,6 +183,8 @@ def to_daily(reviews: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
     days = covered_days(runs)
     r = reviews.copy()
     r["date"] = pd.to_datetime(r["date"])
+    # A header-only log (runs written, no reviews yet) reads stars as text.
+    r["stars"] = pd.to_numeric(r["stars"], errors="coerce")
     r = r[r["date"].isin(days)]
     has_text = r["has_text"].astype(str).str.lower() == "true"
     lang = r["language"].where(has_text)

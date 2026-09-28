@@ -98,13 +98,22 @@ def store(items: pd.DataFrame, place_id: str, node_key: str, max_reviews: int | 
           live: bool = False) -> None:
     """Add one place's reviews to its logs. `live` is a scraper run made just now:
     with no reviews it still records the days it covered (0 reviews, not missing).
-    An import without the place says nothing about it, so nothing is recorded."""
-    p_items = items[items["placeId"] == place_id] if "placeId" in items else items.iloc[0:0]
-    if "reviewId" in p_items:
-        p_items = p_items[p_items["reviewId"].notna()]
-    if p_items.empty or "reviewId" not in p_items:
+    An import without the place says nothing about it, so nothing is recorded.
+
+    A live run returning reviews under another place id (Google merged or
+    moved the listing) records nothing either: marking those days 0 would
+    hide real reviews, and they'd never be fetched again."""
+    with_review = items[items["reviewId"].notna()] if "reviewId" in items else items.iloc[0:0]
+    p_items = with_review[with_review["placeId"] == place_id] if "placeId" in with_review else with_review.iloc[0:0]
+    if p_items.empty:
         if not live:
             print(f"  {node_key}: not in the import")
+            return
+        if not with_review.empty:
+            other = sorted(set(with_review.get("placeId", pd.Series(dtype=object)).dropna().astype(str)))
+            print(f"::warning::{node_key}: {len(with_review)} review(s) came back under place id(s) "
+                  f"{', '.join(other) or '(none)'}, not {place_id}; nothing recorded. The listing may have "
+                  f"moved: check it and update google_reviews.place_id in config/nodes/{node_key}.yaml")
             return
         run = gr.empty_run(items, place_id, datetime.now(gr.JST).date().isoformat(), since)
         _, total = gr.append(node_key, pd.DataFrame(columns=gr.REVIEW_COLS), run)

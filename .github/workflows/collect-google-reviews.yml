@@ -1,13 +1,16 @@
 name: Collect Google reviews
 
 # New Google Maps reviews per node, via the Apify Google Maps Reviews
-# Scraper. Runs weekly on Monday at 09:15 JST and commits to the
-# `live-data` branch, keeping main free of data commits.
+# Scraper. Runs weekly on Monday at 12:45 JST and commits to the
+# `live-data` branch, keeping main free of data commits. The minute is
+# clear of the hourly live-data job (:15) and Rakuten (00:30 UTC): they
+# share one concurrency queue, which keeps only one waiting run, so two
+# runs starting together would cancel one of them.
 # Needs the APIFY_TOKEN repository secret; without it the job does nothing.
 
 on:
   schedule:
-    - cron: "15 0 * * 1"  # UTC; = Monday 09:15 JST
+    - cron: "45 3 * * 1"  # UTC; = Monday 12:45 JST
   workflow_dispatch:
 
 permissions:
