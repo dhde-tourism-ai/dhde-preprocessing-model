@@ -91,7 +91,7 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "rsi_review_count_by_rating_1", "rsi_review_count_by_rating_2", "rsi_review_count_by_rating_3",
     "rsi_review_count_by_rating_4", "rsi_review_count_by_rating_5",
     "hotel_n_room", "hotel_n_people", "hotel_amount_fee", "hotel_n_stay", "hotel_n_reserve", "hotel_capacity",
-    "hotel_occ", "hotel_adr", "hotel_revpar", "hotel_rev_per_guest", "hotel_n_people_lead7",
+    "hotel_occ", "hotel_adr", "hotel_revpar", "hotel_rev_per_guest", "hotel_n_people_lead7", "hotel_lead_used",
     "hotel_is_stale", "hotel_from_bad_snapshot", "hotel_was_imputed", "hotel_neg_fee_adjustment",
     "hotel_n_reserve_reliable",
     "traffic_volume_total", "traffic_volume_upstream", "traffic_volume_downstream", "traffic_hours_observed",

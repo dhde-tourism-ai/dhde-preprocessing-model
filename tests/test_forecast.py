@@ -153,3 +153,35 @@ def test_zero_bookings_a_week_ahead_are_marked_as_closed_for_the_regression():
     x = _regression_matrix(f, ["booked_lead7"])
     assert x["booked_lead7_is_zero"].iloc[0] == 1 and pd.isna(x["booked_lead7_is_zero"].iloc[1])
     assert x["booked_lead7_is_zero"].iloc[2] == 0
+
+
+def test_last_day_of_a_range_still_sees_the_day_after_it():
+    """Regression test (PR #13 review): day 7 of a live forecast is the last
+    day calendar() sees. Sat 2026-10-03 got off_run_len 1 and next_day_off 0."""
+    cal = calendar(pd.date_range("2026-09-27", "2026-10-03"))
+    assert cal.loc["2026-10-03", "off_run_len"] == 2
+    assert cal.loc["2026-10-03", "next_day_off"] == 1
+    assert cal.loc["2026-09-27", "prev_day_off"] == 1  # Sun 27th: Sat 26th was off too
+
+
+def test_bookings_so_far_are_not_used_as_final_counts():
+    """Regression test (PR #13 review): if the museum feed runs late, the last
+    days hold bookings so far. They must become missing, with a warning."""
+    table = _table()
+    k = table["node_key"] == "katsuyama"
+    table.loc[k, "attraction_from_earlier_snapshot"] = 0
+    table.loc[k, "attraction_bookings_final"] = 1
+    last_two = k & (table["date"] >= table["date"].max() - pd.Timedelta(days=1))
+    table.loc[last_two, "attraction_from_earlier_snapshot"] = 1
+    y = node_target(table, "katsuyama")
+    assert y.iloc[-2:].isna().all() and y.iloc[:-2].notna().all()
+    _, _, report = forecast(table, weeks=4)
+    assert any("only had bookings so far" in w for w in report["warnings"])
+
+
+def test_a_backtest_too_short_to_check_the_range_does_not_crash():
+    """Regression test (PR #13 review): np.quantile on an empty first half
+    raised IndexError with --weeks 1 or a node whose data starts late."""
+    fc, scores, _ = forecast(_table(), weeks=1)
+    assert scores["coverage_holdout"].isna().all()
+    assert fc["predicted"].notna().all()

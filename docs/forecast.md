@@ -112,6 +112,13 @@ is on dates later than anything the model trained on, and the test
 window includes Golden Week and Obon 2026. `tests/test_forecast.py`
 checks that no feature uses a value after the day the forecast is made.
 
+**Bookings that aren't final yet** are left out. Katsuyama's museum
+bookings and Awara's hotel guests are only final once the visit day's own
+snapshot is in (`attraction_from_earlier_snapshot`, `attraction_bookings_final`,
+`hotel_lead_used`). If a feed runs late, the latest days hold bookings so
+far; they're set to missing instead of being used as actuals, and the run
+warns.
+
 All models are scored on the same days. WAPE = sum of |error| / sum of
 actual visitors.
 
@@ -125,18 +132,18 @@ the busy summer weeks), so the wider band is used and read as a roughly
 check is itself a small choice made on test data; the next months'
 coverage is the real test.
 
-## Results (backtest to 2026-09-26, WAPE)
+## Results (backtest to 2026-09-27, WAPE)
 
 | Node | Baseline | Regression | LightGBM | Used |
 |---|---|---|---|---|
-| Fukui Station | 20.4% | 16.1% | 16.1% | Regression (tie) |
-| Tojinbo | 36.9% | 27.6% | 28.4% | Regression |
-| Rainbow Line | 47.9% | 41.8% | 39.2% | LightGBM |
-| Katsuyama | 64.4% | 13.6% | 25.9% | Regression |
-| Awara Onsen | 26.4% | 2.8% | 6.2% | Regression |
+| Fukui Station | 20.3% | 16.0% | 15.2% | LightGBM |
+| Tojinbo | 37.1% | 27.7% | 28.6% | Regression |
+| Rainbow Line | 47.8% | 42.0% | 38.5% | LightGBM |
+| Katsuyama | 67.3% | 13.4% | 24.3% | Regression |
+| Awara Onsen | 26.6% | 2.8% | 6.0% | Regression |
 
-Range coverage on unseen weeks, for the model used: Fukui Station 85%,
-Tojinbo 75%, Rainbow Line 92%, Katsuyama 90%, Awara Onsen 81%.
+Range coverage on unseen weeks, for the model used: Fukui Station 77%,
+Tojinbo 74%, Rainbow Line 91%, Katsuyama 89%, Awara Onsen 80%.
 
 **Why Awara Onsen scores so well:** about 96% of its final guests are
 already booked 7 days ahead (median), so the week-ahead bookings alone
@@ -150,7 +157,7 @@ that.
 
 The briefing's baseline figures (22% at Fukui Station, 44% at Tojinbo)
 were measured on a different window; on this one the baseline is
-20.4% and 36.9%.
+20.3% and 37.1%. Numbers shift slightly day to day as the 26-week window moves.
 
 ## Known limits and next steps
 

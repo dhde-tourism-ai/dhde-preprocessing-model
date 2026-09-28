@@ -103,14 +103,34 @@ FEATURES = CALENDAR_FEATURES + LAG_FEATURES + KNOWN_AHEAD_FEATURES
 
 # --- features -------------------------------------------------------------
 
-def calendar(dates: pd.DatetimeIndex) -> pd.DataFrame:
-    """Calendar features, all known in advance."""
+CALENDAR_PAD = 7  # days looked at on each side, so a range's first and last days see their neighbours
+
+
+def _days_off(dates: pd.DatetimeIndex) -> pd.Series:
     md = dates.month * 100 + dates.day
     new_year = (md >= 1229) | (md <= 103)
-    off = (dates.dayofweek >= 5) | np.array([jpholiday.is_holiday(d) for d in dates]) | new_year
-    off = pd.Series(off, index=dates)
-    run_id = (off != off.shift()).cumsum()
-    run_len = off.groupby(run_id).transform("size").where(off, 0)
+    return pd.Series((dates.dayofweek >= 5) | np.array([jpholiday.is_holiday(d) for d in dates]) | new_year,
+                     index=dates)
+
+
+def calendar(dates: pd.DatetimeIndex) -> pd.DataFrame:
+    """Calendar features, all known in advance.
+
+    Day-off runs are worked out over the range padded by CALENDAR_PAD days
+    on each side, then trimmed. Without the padding, the last day of a
+    range (day 7 of every live forecast) had its weekend or holiday run cut
+    short and "next day off" always 0 (review of PR #13).
+    """
+    md = dates.month * 100 + dates.day
+    new_year = (md >= 1229) | (md <= 103)
+    pad = pd.Timedelta(days=CALENDAR_PAD)
+    wide = _days_off(pd.date_range(dates.min() - pad, dates.max() + pad))
+    run_id = (wide != wide.shift()).cumsum()
+    wide_run = wide.groupby(run_id).transform("size").where(wide, 0)
+    off = wide.reindex(dates)
+    run_len = wide_run.reindex(dates)
+    prev_off = wide.shift(1).reindex(dates)
+    next_off = wide.shift(-1).reindex(dates)
     return pd.DataFrame({
         "dow": dates.dayofweek,
         "month": dates.month,
@@ -119,19 +139,43 @@ def calendar(dates: pd.DatetimeIndex) -> pd.DataFrame:
         "week_of_month": (dates.day - 1) // 7 + 1,
         "is_day_off": off.astype(int).to_numpy(),
         "off_run_len": run_len.to_numpy(),  # 2 = normal weekend, 3+ = long weekend or holiday block
-        "prev_day_off": off.shift(1, fill_value=False).astype(int).to_numpy(),
-        "next_day_off": off.shift(-1, fill_value=False).astype(int).to_numpy(),
+        "prev_day_off": prev_off.astype(int).to_numpy(),
+        "next_day_off": next_off.astype(int).to_numpy(),
         "is_golden_week": ((md >= 429) & (md <= 506)).astype(int),
         "is_obon": ((md >= 813) & (md <= 816)).astype(int),
         "is_new_year": new_year.astype(int),
     }, index=dates)
 
 
+# Booking targets are only final once the visit day's own snapshot is in. If a
+# feed runs late, the latest days hold bookings so far; used as actuals they'd
+# pull forecasts and scores down with no warning (review of PR #13).
+NOT_FINAL = {
+    "katsuyama": lambda rows: rows["attraction_from_earlier_snapshot"].eq(1)
+                              | rows["attraction_bookings_final"].eq(0),
+    "awara_onsen": lambda rows: rows["hotel_lead_used"].gt(0),
+}
+
+
+def not_final_days(table: pd.DataFrame, node_key: str) -> pd.DatetimeIndex:
+    """Days whose target is bookings so far, not the final count."""
+    rule = NOT_FINAL.get(node_key)
+    rows = table[table["node_key"] == node_key].set_index("date")
+    if rule is None:
+        return pd.DatetimeIndex([])
+    try:
+        return rows.index[rule(rows).fillna(False).to_numpy(bool)]
+    except KeyError:  # older tables without the flag column
+        return pd.DatetimeIndex([])
+
+
 def node_target(table: pd.DataFrame, node_key: str) -> pd.Series:
-    """Daily target for one node on a full calendar; missing where any part is missing."""
+    """Daily target for one node on a full calendar; missing where any part is
+    missing, or where bookings aren't final yet (NOT_FINAL)."""
     cols, _ = TARGETS[node_key]
     rows = table[table["node_key"] == node_key].set_index("date").sort_index()
     y = rows[cols].sum(axis=1, min_count=len(cols))
+    y[y.index.isin(not_final_days(table, node_key))] = np.nan
     return y.reindex(pd.date_range(y.index.min(), y.index.max(), name="date"))
 
 
@@ -293,14 +337,19 @@ def score(bt: pd.DataFrame) -> pd.DataFrame:
         log_err = np.log1p(g["actual"]) - np.log1p(g["predicted"].clip(lower=0))
         lo, hi = np.quantile(log_err, INTERVAL)
         calib = g["origin"].isin(calib_origins)
-        c_lo, c_hi = np.quantile(log_err[calib], INTERVAL)
         later = log_err[~calib]
+        # Too little backtest to check the range (e.g. --weeks 1, or a node whose
+        # data starts in the later half): leave its coverage unknown, don't crash.
+        if calib.sum() < 7 or later.empty:
+            c_lo = c_hi = np.nan
+        else:
+            c_lo, c_hi = np.quantile(log_err[calib], INTERVAL)
         return pd.Series({
             "days": len(g),
             "wape": err.abs().sum() / g["actual"].sum(),
             "mape_nonzero": (err[nz].abs() / g.loc[nz, "actual"]).mean(),
             "log_err_low": lo, "log_err_high": hi,
-            "coverage_holdout": ((later >= c_lo) & (later <= c_hi)).mean(),
+            "coverage_holdout": ((later >= c_lo) & (later <= c_hi)).mean() if not np.isnan(c_lo) else np.nan,
         })
 
     return bt.groupby(["node_key", "model"]).apply(one, include_groups=False).reset_index()
@@ -361,7 +410,7 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
             "predicted": np.round(pred), "low": np.round(low), "high": np.round(high),
             "backtest_wape": round(row["wape"], 4),
             "baseline_wape": round(baseline.loc[node_key, "wape"], 4),
-            "range_coverage": round(row["coverage_holdout"], 3),
+            "range_coverage": round(row["coverage_holdout"], 3) if pd.notna(row["coverage_holdout"]) else np.nan,
         }))
     # Nodes without a visitor factor (Fukui Station) have all-empty visitor columns;
     # leave them out of the concat's dtype decision, then restore them.
@@ -376,6 +425,12 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
             warnings.append(f"{node_key}: no week-ahead bookings in the input ({', '.join(cols.values())}), so it was "
                             f"forecast without them and scores worse; rebuild the node tables with this code "
                             f"(build_node.py, then build_integrated.py)")
+    for node_key in NOT_FINAL:
+        recent = not_final_days(table, node_key)
+        recent = recent[recent > table["date"].max() - pd.Timedelta(days=14)]
+        if len(recent):
+            warnings.append(f"{node_key}: {len(recent)} recent day(s) only had bookings so far (feed late?), so they "
+                            f"were left out as missing: " + ", ".join(str(d.date()) for d in recent))
     if fc["week_ahead_missing"].any():
         late = fc.loc[fc["week_ahead_missing"], ["node_key", "date"]]
         warnings.append(f"{len(late)} forecast day(s) had no week-ahead bookings (late feed?) and used the "

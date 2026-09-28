@@ -278,7 +278,7 @@ def _run_pipeline(raw: pd.DataFrame, hotels: pd.DataFrame, P: dict) -> tuple[pd.
 # ── Public interface ─────────────────────────────────────────────────────
 
 MASTER_COLS = [
-    "n_room", "n_people", "amount_fee", "n_stay", "n_reserve", "capacity", "n_people_lead7",
+    "n_room", "n_people", "amount_fee", "n_stay", "n_reserve", "capacity", "n_people_lead7", "lead_used",
     "occ", "adr", "revpar", "rev_per_guest",
     "is_stale", "from_bad_snapshot", "was_imputed", "neg_fee_adjustment", "n_reserve_reliable",
 ]
@@ -327,6 +327,10 @@ def load_hotel(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
         [["date_visit", "n_people"]].rename(columns={"date_visit": "date", "n_people": "n_people_lead7"})
     )
     final_daily = final_daily.merge(week_ahead, on="date", how="left")
+    # Days before the stay of the snapshot each row came from. 0 = the stay
+    # day's own snapshot (final); more means the feed hadn't caught up yet and
+    # the numbers are bookings so far (a forecast mustn't treat them as final).
+    final_daily["lead_used"] = final_daily["lead_time"]
 
     notes = [
         f"regional source: {hotel_cfg['repo']}" if hotel_cfg.get("scope") == "regional" else f"station-specific source: {hotel_cfg['repo']}",

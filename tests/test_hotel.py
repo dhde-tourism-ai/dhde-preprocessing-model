@@ -142,3 +142,16 @@ def test_week_ahead_guests_come_from_a_snapshot_at_least_7_days_early(patch_reso
     day = df.set_index("date").loc[pd.Timestamp("2024-01-10")]
     assert day["n_people"] == 60        # visit day
     assert day["n_people_lead7"] == 30  # 2024-01-03 (lead 7): not 01-08 (lead 2), not 01-01 (lead 9)
+
+
+def test_lead_used_says_whether_a_day_is_final(patch_resolve_path):
+    """lead_used > 0 means the stay day's own snapshot isn't in yet, so the
+    numbers are bookings so far; the forecast leaves such days out."""
+    tmp_path = patch_resolve_path
+    row = lambda d: [d, 2, 10, 10, 100000, 2]
+    repo = _write_repo(tmp_path, {"2024-01-01": [row("2024-01-01"), row("2024-01-02")]}, [[100, "2020-01-01"]])
+    df, _ = hotel.load_hotel({"node_key": "awara_onsen", "sources": {"hotel": {
+        "enabled": True, "repo": repo.name, "scope": "area-specific"}}})
+    df = df.set_index("date")
+    assert df.loc[pd.Timestamp("2024-01-01"), "lead_used"] == 0  # its own snapshot
+    assert df.loc[pd.Timestamp("2024-01-02"), "lead_used"] == 1  # only seen a day early
