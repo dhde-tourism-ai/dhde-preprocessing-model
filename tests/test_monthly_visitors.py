@@ -11,12 +11,13 @@ def _official_csv(rows: list[tuple]) -> pd.DataFrame:
 
 @pytest.fixture
 def official(monkeypatch):
-    """Three publisher files: a yearly city and pref file for 2024, and a
-    monthly city file that re-issues Feb 2024 with a revised figure."""
+    """Three publisher files: a monthly city file for Feb 2024, then the
+    yearly city and pref files for 2024, published once the year closed,
+    which revise Feb. Listed as strings sort (city2024 first)."""
     files = {
         "city2024": _official_csv([
             (2024, 1, "市区町村", "観光来訪者数", 17201, "金沢市", 310),
-            (2024, 2, "市区町村", "観光来訪者数", 17201, "金沢市", 290),
+            (2024, 2, "市区町村", "観光来訪者数", 17201, "金沢市", 295),
             (2024, 1, "市区町村", "観光来訪者数", 18201, "福井市", None),
         ]),
         "pref2024": _official_csv([
@@ -24,7 +25,7 @@ def official(monkeypatch):
             (2024, 2, "都道府県", "観光来訪者数", 17, "石川県", 870),
         ]),
         "city202402": _official_csv([
-            (2024, 2, "市区町村", "観光来訪者数", 17201, "金沢市", 295),
+            (2024, 2, "市区町村", "観光来訪者数", 17201, "金沢市", 290),
         ]),
     }
     monkeypatch.setattr(monthly_visitors, "list_official_csvs",
@@ -80,6 +81,19 @@ def test_fetch_failure_is_an_error_report_not_a_crash(monkeypatch):
     monthly_visitors.load_official_table.cache_clear()
     assert df is None
     assert report.status == "error"
+
+
+def test_fetch_failure_is_cached_for_the_run(monkeypatch):
+    calls = []
+    def boom():
+        calls.append(1)
+        raise ConnectionError("offline")
+    monkeypatch.setattr(monthly_visitors, "list_official_csvs", boom)
+    monthly_visitors.load_official_table.cache_clear()
+    monthly_visitors.load_monthly_visitors(_cfg())
+    monthly_visitors.load_monthly_visitors(_cfg(city=18201, pref=18))
+    monthly_visitors.load_official_table.cache_clear()
+    assert len(calls) == 1
 
 
 def test_page_links_are_parsed():
