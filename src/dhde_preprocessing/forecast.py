@@ -356,20 +356,32 @@ def score(bt: pd.DataFrame) -> pd.DataFrame:
 
 
 def calibration(y: pd.Series, node_cfg: dict) -> dict:
-    """Factor converting a node's measured count into visitors (see module docstring)."""
+    """Factor converting a node's measured count into visitors (see module docstring).
+
+    The official figure covers either a calendar `year` or a `period`
+    [start, end] (e.g. a fiscal year, April to March); the count is
+    averaged over the same days.
+    """
     off = node_cfg.get("official_visitors") or {}
-    year, count = off.get("year"), off.get("count")
-    info = {"official_year": year, "official_visitors": count, "source": off.get("source"),
+    count = off.get("count")
+    if off.get("period"):
+        start, end = (pd.Timestamp(d) for d in off["period"])
+    elif off.get("year"):
+        start, end = pd.Timestamp(year=off["year"], month=1, day=1), pd.Timestamp(year=off["year"], month=12, day=31)
+    else:
+        start = end = None
+    info = {"official_period": [str(start.date()), str(end.date())] if start is not None else None,
+            "official_visitors": count, "source": off.get("source"),
             "factor": None, "measured_days": 0, "status": "no official figure"}
-    if not year or not count:
+    if start is None or not count:
         return info
-    in_year = y[(y.index.year == year)].dropna()
-    info["measured_days"] = int(len(in_year))
-    if len(in_year) < MIN_CALIBRATION_DAYS or in_year.mean() <= 0:
-        info["status"] = f"too few measured days in {year} ({len(in_year)} < {MIN_CALIBRATION_DAYS})"
+    in_period = y[(y.index >= start) & (y.index <= end)].dropna()
+    info["measured_days"] = int(len(in_period))
+    if len(in_period) < MIN_CALIBRATION_DAYS or in_period.mean() <= 0:
+        info["status"] = f"too few measured days in the official period ({len(in_period)} < {MIN_CALIBRATION_DAYS})"
         return info
-    days = 366 if pd.Timestamp(year=year, month=12, day=31).dayofyear == 366 else 365
-    info["factor"] = round(count / (in_year.mean() * days), 6)
+    days = (end - start).days + 1
+    info["factor"] = round(count / (in_period.mean() * days), 6)
     info["status"] = "ok"
     return info
 

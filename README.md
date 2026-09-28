@@ -1,66 +1,151 @@
 # dhde-preprocessing-model
 
-Per-node data preprocessing for the DHDE (Distributed Human Data Engine)
-tourism dashboard covering Fukui/Hokuriku, Japan. This package's job stops
-at: **raw source → cleaned, validated, date-keyed table → one joined
-master table per node.** It does not build 0–100 normalized scores. It
-also holds the forecasts that ship in the same daily build: the monthly
-one (see "Monthly forecast" below) and the 7-day one (`docs/forecast.md`).
+The data and forecasting pipeline behind the DHDE tourism app
+(https://dhde-tourism-ai.github.io/dhde-app/) for Fukui and Hokuriku, Japan.
+
+It takes public tourism data (cameras, weather, hotel bookings, surveys,
+search interest, traffic), cleans it, and builds one daily table per site.
+It then forecasts visitors per site: daily for the next 7 days, and monthly
+for the next 12.
+
+**Main is live.** Every morning at 09:00 JST the app rebuilds its data from
+this repo's `main` branch, so a merged change shows on the site the next
+day. Work on a branch and open a pull request.
+
+## Contents
+
+- [How the pipeline works](#how-the-pipeline-works)
+- [Quickstart](#quickstart)
+- [What each step writes](#what-each-step-writes)
+- [Sites (nodes)](#sites-nodes)
+- [Docs](#docs)
+- [Adding a site](#the-template-pattern)
+- [Reference: how each source is handled](#non-obvious-things-found-while-building-this--read-before-extending)
+- [Tests](#tests)
+
+## How the pipeline works
+
+```
+raw public data
+  -> build_node.py          one cleaned daily table per site ("master table")
+  -> build_integrated.py    all Fukui sites in one table, same columns, ready for models
+  -> build_forecast.py      7-day forecast per site, with a low/high range
+  -> check_calibration.py   checks the conversion from measured counts to visitors
+
+forecast_monthly.py         12-month forecast (downloads its own data, runs on its own)
+```
+
+Three rules hold throughout:
+
+- **Missing stays missing.** A missing or broken value is left empty and
+  flagged, never turned into 0 or made up.
+- **No future data in forecasts.** Every forecast input is known before
+  the day being forecast, and tests check this.
+- **Every site uses only its own real data.** Where a source doesn't
+  exist for a site, the coverage report says so with the reason.
 
 ## Quickstart
 
 ```bash
 pip install -r requirements.txt
-python scripts/fetch_data.py          # clone the code4fukui data repos
-python scripts/build_node.py --node tojinbo
-python scripts/build_node.py --all
+python scripts/fetch_data.py                 # 1. download the data repos
+python scripts/build_node.py --all           # 2. build every site's master table
+python scripts/build_integrated.py           # 3. combine the six Fukui sites
+python scripts/build_forecast.py             # 4. 7-day forecast
+python scripts/check_calibration.py          # 5. (optional) check the visitor conversion
+python scripts/forecast_monthly.py           # 12-month forecast, independent of 2 to 5
+pytest                                       # run the tests
 ```
 
-**Where the data goes:** the pipeline reads its data repos from
-`DHDE_WORKSPACE_ROOT`, which defaults to the folder *above* this repo. So
-if this repo is at `~/work/dhde-preprocessing-model`, the data repos go in
-`~/work/`. `scripts/fetch_data.py` reads the node configs, clones every
-repo they need there (only the files used, for the big ones), and updates
-them on later runs. If your data repos already live elsewhere, set
-`DHDE_WORKSPACE_ROOT` to that folder instead. A missing repo shows up as
-that source's error in the coverage report, with this hint, instead of
-stopping the build.
+Build one site only with `python scripts/build_node.py --node tojinbo`.
 
-Each run prints a per-source coverage report (status, row count, date
-range, calendar gaps, null rates) and writes to `output/`:
+**Where the data repos go:** next to this repo. If this repo is at
+`~/work/dhde-preprocessing-model`, `fetch_data.py` puts the data in `~/work/`
+(only the files needed, for the big repos) and updates it on later runs. To
+use data that lives elsewhere, set `DHDE_WORKSPACE_ROOT` to that folder. A
+missing repo shows up as that source's error in the coverage report
+instead of stopping the build.
 
-- `{node}_master.parquet` / `.csv` — the joined daily table
-- `{node}_survey_responses.parquet` — raw response-level survey rows (see "Why survey is different" below)
-- `{node}_coverage_report.json` — the same coverage info as machine-readable JSON
+**Some sources need keys**, read from environment variables, never from
+config (this repo is public): `TOMTOM_API_KEY` for road congestion,
+`RAKUTEN_APP_ID` and `RAKUTEN_ACCESS_KEY` for Rakuten hotel availability.
+Without them those sources are reported as unavailable and the build goes
+on.
 
-For model training, `python scripts/build_integrated.py` stacks the six
-Fukui nodes' master tables into one table (`output/integrated_fukui_train.parquet`,
-plus `integrated_fukui.parquet` with future bookings for the dashboard):
-same columns for every node, one row per node per day, cleaned of the
-things that would bias a model (leaked future rows, mixed RSI levels,
-missing read as zero). Columns and rules: [`docs/integrated_dataset.md`](docs/integrated_dataset.md).
+**Live traffic and hotel history** (JARTIC, TomTom, Rakuten) can't be
+downloaded after the fact, so GitHub Actions saves it to the `live-data`
+branch (see [Collecting live data](#collecting-live-data-history-cant-be-backfilled)).
+To build with it, point `DHDE_LIVE_DATA_ROOT` at a checkout of that branch.
 
-Then `python scripts/build_forecast.py` forecasts visitors 1 to 7 days
-ahead per node with a low/high range (`output/forecast_fukui.parquet`),
-backtested on the last 26 weeks against "same weekday last week". What's
-forecast, how it's tested and the current scores: [`docs/forecast.md`](docs/forecast.md).
+## What each step writes
 
-What's missing per node, and what's used instead, is tracked in
-[`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in
-[`docs/site_capacity.md`](docs/site_capacity.md). Suggested Osaka and Kyoto sources, and what each really contains, are in
-[`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md).
+Everything goes to `output/`, which is not committed.
+
+| Step | File | What it is |
+|---|---|---|
+| `build_node.py` | `{node}_master.parquet` / `.csv` | One row per day for one site, every source joined on `date` |
+| | `{node}_survey_responses.parquet` | Survey answers, one row per response (see [why](#why-survey-is-handled-differently-from-the-other-sources)) |
+| | `{node}_coverage_report.json` | Per source: status, rows, date range, gaps, missing-value rates |
+| `build_integrated.py` | `integrated_fukui_train.parquet` | Six Fukui sites, one row per site per day, up to yesterday: the training table |
+| | `integrated_fukui.parquet` | The same, continued with future bookings, for the app |
+| | `integrated_kyoto*.parquet`, `integrated_osaka*.parquet` | The same for Kyoto and Osaka (`--region kyoto` or `osaka`), same columns |
+| `build_forecast.py` | `forecast_fukui.parquet` / `.csv` | Next 7 days per site: visitors and the site's own count, each with low/high, plus the backtest error |
+| `check_calibration.py` | `calibration_check.csv` | Per site: the visitor factor and how well its count tracks official monthly visitors |
+| `forecast_monthly.py` | `monthly_forecast.csv` | Next 12 months per town, the prefecture and guest-nights |
+
+## Sites (nodes)
+
+Each site is one config file in `config/nodes/`.
+
+| Region | Sites | Notes |
+|---|---|---|
+| Fukui (priority six) | `tojinbo`, `fukui_station`, `rainbow_line`, `katsuyama`, `awara_onsen`, `eiheiji` | Integrated table and 7-day forecast. Eiheiji isn't forecast yet (no daily visitor count) |
+| Ishikawa | `kanazawa`, `kaga_onsen`, `komatsu`, `nanao` | See [Ishikawa and Toyama nodes](#ishikawa-and-toyama-nodes) |
+| Toyama | `toyama_station`, `takaoka`, `himi`, `tateyama` | Same |
+| Kyoto | `kyoto_station`, `arashiyama`, `fushimi_inari`, `higashiyama` | Integrated table only. See [Kyoto and Osaka nodes](#kyoto-and-osaka-nodes) |
+| Osaka | `osaka_station`, `namba`, `osaka_castle`, `usj` | Same |
+
+What each Fukui site measures:
+
+| Site | Visitor signal | Forecast converted to visitors with |
+|---|---|---|
+| Tojinbo | People camera | Official 2025 count (651k) |
+| Fukui Station | People camera | No official site figure, so it stays in detections |
+| Rainbow Line | Cars at two summit car parks | Official 2025 count (443k) |
+| Katsuyama | Dinosaur Museum advance bookings | Museum entries, FY2025 (1,298,975) |
+| Awara Onsen | Guests at the 10 hotels in its feed | Official 2025 count (658k) |
+| Eiheiji | None yet | |
+
+## Docs
+
+| Doc | What's in it |
+|---|---|
+| [`docs/forecast.md`](docs/forecast.md) | The 7-day forecast: targets, features, models, how it's tested, current scores |
+| [`docs/calibration.md`](docs/calibration.md) | Turning each site's count into visitors, and whether one factor per site is sound |
+| [`docs/integrated_dataset.md`](docs/integrated_dataset.md) | The integrated table's columns and cleaning rules |
+| [`docs/data_gaps.md`](docs/data_gaps.md) | What's missing per site, and what's used instead |
+| [`docs/site_capacity.md`](docs/site_capacity.md) | Official visitor counts, parking and other limits per site |
+| [`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md) | The suggested Osaka and Kyoto sources, and why most aren't usable |
+| [Monthly forecast](#monthly-forecast) (below) | The 12-month forecast |
+
+---
+
+# Reference
+
+The sections below are for working on the pipeline itself: how sites are
+configured and how each data source is handled.
 
 ## The template pattern
 
-Every node is: **one YAML config + the same six source modules**, nothing
+Every node is **one YAML config + the shared source modules**, nothing
 node-specific in Python. `config/nodes/{node}.yaml` declares which
 sources apply and their node-specific parameters (sensor file paths,
 weather station id, RSI/survey area name or id, JARTIC point code).
 `src/dhde_preprocessing/join.py` reads that config, calls each source
 module, and merges everything on `date`.
 
-**Onboarding a 5th node is: write a config, not write code.** Copy an
-existing node's YAML, adjust:
+**Adding a site means writing a config, not code.** Copy an existing
+node's YAML and adjust:
 
 | Source | What a new node's config needs |
 |---|---|
@@ -74,8 +159,8 @@ existing node's YAML, adjust:
 | `visitor_reservation` | Optional, only where an attraction publishes entry bookings: `enabled: true` and `repo` (currently `dinosaur-opendata` for Katsuyama). Adds `reserved_visitors` / `reserved_fee` from the visit-day snapshot, and `bookings_final` (False for future dates, which are bookings so far). Reserved entries only, not total visitors; see `sources/visitor_reservation.py`. |
 | `road_congestion` | `enabled: true` and `radius_km` (default 2). Live TomTom Orbis traffic-flow tiles; needs the `TOMTOM_API_KEY` environment variable (free tier, no card). Adds `road_congestion` (1 - mean relative speed of roads within the radius) plus relative-speed columns. Snapshots are cached under `{workspace_root}/tomtom_cache/`, so history only builds up if the pipeline runs on a schedule; see `sources/road_congestion.py`. |
 
-Every source function has the signature `load_x(node_cfg) -> (df | None, SourceReport)`. If you add a 7th source
-type later, follow that same signature and register it in
+Every source function has the signature `load_x(node_cfg) -> (df | None, SourceReport)`. If you add a new source
+type, follow that same signature and register it in
 `join.py`'s `SOURCE_LOADERS` (or handle it separately like `survey`, if
 it isn't naturally one-row-per-day).
 
@@ -352,9 +437,9 @@ chosen model's backtest errors. Details and thresholds are in
   municipalities, 9% for the prefecture and 9–10% for guest-nights
   (17% for foreign guest-nights, a small and volatile series).
 
-## Why survey is handled differently from the other five sources
+## Why survey is handled differently from the other sources
 
-The other five sources are naturally one-row-per-day. Survey responses
+The other sources are naturally one-row-per-day. Survey responses
 are one-row-per-response — many per day. Aggregating that down to a
 score or summary is a modeling-stage decision (which fields to average,
 how to weight them), out of scope here. So `sources/survey.py` returns
