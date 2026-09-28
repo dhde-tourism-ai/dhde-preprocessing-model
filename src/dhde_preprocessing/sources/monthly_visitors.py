@@ -65,7 +65,7 @@ def list_official_csvs() -> tuple[list[tuple[str, str]], str]:
     try:
         resp = requests.get(OFFICIAL_PAGE, timeout=60)
         resp.raise_for_status()
-        files = sorted(set(CSV_LINK_RE.findall(resp.text)), key=lambda f: f[1])
+        files = sorted(set(CSV_LINK_RE.findall(resp.text)), key=lambda f: publish_order(f[1]))
         if not files:
             raise ValueError("no city/pref CSV links found on the page")
     except Exception as e:  # noqa: BLE001 - fall back to the cached list on any failure
@@ -77,16 +77,36 @@ def list_official_csvs() -> tuple[list[tuple[str, str]], str]:
     return files, f"file list: {len(files)} CSVs linked from {OFFICIAL_PAGE}"
 
 
+def publish_order(stem: str) -> tuple[int, bool, str]:
+    """Sort key putting files in the order they were published.
+
+    A year's monthly files come before its yearly file, which appears only
+    once the year closes. Sorting the stems as strings would put city2026
+    before city202601.
+    """
+    digits = stem.removeprefix("city").removeprefix("pref")
+    return int(digits[:4]), len(digits) == 4, digits
+
+
 @lru_cache(maxsize=1)
-def load_official_table() -> tuple[pd.DataFrame, tuple[str, ...]]:
+def load_official_table() -> tuple[pd.DataFrame | None, tuple[str, ...]]:
     """All publisher files as one (month YYYYMM, lgcode, n) table.
 
     Cached per process: every node reads the same national table, so it is
-    downloaded once per build, not once per node.
+    downloaded once per build, not once per node. A failure is cached too,
+    as (None, notes): lru_cache doesn't cache exceptions, so without this
+    every node would retry every download.
     """
+    try:
+        return _read_official_table()
+    except Exception as e:  # noqa: BLE001 - a live fetch failure must not crash the whole run
+        return None, (f"official digital tourism statistics fetch failed: {e!r}",)
+
+
+def _read_official_table() -> tuple[pd.DataFrame, tuple[str, ...]]:
     files, list_note = list_official_csvs()
     frames, notes = [], [list_note]
-    for url, stem in files:
+    for url, stem in sorted(files, key=lambda f: publish_order(f[1])):
         # The publisher's CSVs are Shift_JIS (cp932), not UTF-8.
         df, note = fetch_csv(url, f"kanko_stat_{stem}", encoding="cp932")
         if not note.startswith("fetched live"):
@@ -98,8 +118,8 @@ def load_official_table() -> tuple[pd.DataFrame, tuple[str, ...]]:
         "lgcode": raw["地域コード"].astype(int),
         "n": pd.to_numeric(raw["人数"], errors="coerce"),
     }).dropna(subset=["n"])
-    # Files are read oldest first, so if a month ever appears in both a
-    # yearly and a monthly file, the later-published one wins.
+    # Files are read in publish order (publish_order), so if a month ever
+    # appears in both a yearly and a monthly file, the later-published one wins.
     table = table.drop_duplicates(["month", "lgcode"], keep="last").sort_values(["lgcode", "month"])
     return table.reset_index(drop=True), tuple(notes)
 
@@ -118,11 +138,10 @@ def load_monthly_visitors(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRe
     if not m_cfg.get("enabled"):
         return None, unavailable_report("monthly_visitors", node_key, m_cfg.get("reason", "monthly visitors disabled for this node"))
 
-    try:
-        stats, fetch_notes = load_official_table()
-    except Exception as e:  # noqa: BLE001 - a live fetch failure must not crash the whole run
+    stats, fetch_notes = load_official_table()
+    if stats is None:
         return None, SourceReport(source="monthly_visitors", node_key=node_key, status="error",
-                                  notes=[f"official digital tourism statistics fetch failed: {e!r}"])
+                                  notes=list(fetch_notes))
     frames, notes = [], list(fetch_notes)
     for level in ("city", "pref"):
         code = m_cfg[f"{level}_lgcode"]
