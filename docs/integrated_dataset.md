@@ -1,13 +1,17 @@
 # Integrated dataset
 
-One table for the six Fukui nodes, one row per node per day, the same
+One table per region (Fukui's six nodes, Kyoto's four, Osaka's four), one row per node per day, the same
 columns for every node. Built from the node master tables by
 `src/dhde_preprocessing/integrate.py`:
 
 ```bash
 python scripts/build_node.py --node fukui_station   # ...and the other five, or --all
-python scripts/build_integrated.py
+python scripts/build_integrated.py                   # Fukui
+python scripts/build_integrated.py --region kyoto    # or osaka
 ```
+
+Each region writes the same three files, named `integrated_{region}...`;
+the file names below use Fukui's.
 
 Outputs, in `output/`:
 
@@ -37,9 +41,9 @@ Outputs, in `output/`:
 
 ## Columns
 
-The table always has the same 70 columns, in the same order
-(`EXPECTED_COLUMNS` in `integrate.py`), even when a source fails on a run
-or has no data yet. An expected column with no data at all is listed
+The table always has the same 80 columns, in the same order
+(`EXPECTED_COLUMNS` in `integrate.py`), for every region and even when a
+source fails on a run or has no data yet. An expected column with no data at all is listed
 under `warnings` in `integrated_fukui_report.json` (today: the `road_*`
 columns). A column a source adds later is left out and named there too,
 until it's added to `EXPECTED_COLUMNS`.
@@ -65,6 +69,8 @@ until it's added to `EXPECTED_COLUMNS`.
 | `rsi_` | Google Maps / search intent | `rsi_map_views`, `rsi_search_views`, `rsi_directions`, … and `rsi_level` (`area` or `prefecture`) | All (Tojinbo 2026 only, Eiheiji from 2026-06) |
 | `hotel_` | Reservation feeds, cleaned | `hotel_occ`, `hotel_adr`, `hotel_revpar`, `hotel_n_room`, `hotel_n_people_lead7` (guests booked as of 7+ days before), `hotel_lead_used` (days before the stay of the snapshot used; 0 = final), … and flags `hotel_was_imputed`, `hotel_is_stale`, … | All (Rainbow Line from 2025-06) |
 | `traffic_` | JARTIC road counter | `traffic_volume_total`, `traffic_hours_observed` | Fukui Station, Katsuyama, Rainbow Line, Eiheiji (last ~90 days only) |
+| (none) | Monthly visitors, JTA statistics | `city_visitors_month`, `pref_visitors_month`: the month's total, repeated on every day of it | Kyoto, Osaka (Fukui configs don't opt in yet) |
+| `rakuten_` | Rakuten Travel availability | `rakuten_vacant_share_d1` / `_d7` / `_d30` (share of hotels with a room left 1, 7, 30 days before), `rakuten_min_charge_*` | Kyoto, Osaka; history only from the first daily run |
 | `road_` | TomTom road congestion | `road_congestion` (1 - mean relative speed), `road_relative_speed_mean`, `road_relative_speed_min`, `road_snapshots` | All six, once the collector has history (empty today) |
 | `survey_` | Visitor survey responses | `survey_response_count` | All |
 | `proxy_` | Stand-ins for nodes without a camera | `proxy_camera_count` (Tojinbo's camera, for Awara Onsen), `proxy_survey_count` | Awara Onsen, Eiheiji, Katsuyama |

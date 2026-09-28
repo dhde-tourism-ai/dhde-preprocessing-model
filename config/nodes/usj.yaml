@@ -1,0 +1,67 @@
+node_key: usj
+label: "Universal Studios Japan (ユニバーサル・スタジオ・ジャパン)"
+coordinates:
+  lat: 34.6654
+  lon: 135.4323  # park entrance
+
+sources:
+  # Osaka node. Same source layout as the Fukui nodes, but code4fukui's
+  # camera, RSI, hotel and survey datasets are Fukui-only and no Osaka
+  # equivalent was found (see docs/osaka_kyoto_sources.md), so those are
+  # disabled rather than filled with another prefecture's data.
+  camera:
+    enabled: false
+    reason: >
+      fukui-kanko-people-flow-data covers Fukui sensors only, and no public
+      people-counting camera data was found for Universal Studios Japan
+      (checked 2026-09-27).
+
+  weather:
+    enabled: true
+    station_name: "大阪 (Osaka)"
+    prec_no: "62"  # 大阪府
+    block_no: "47772"  # nearest full-observation JMA station, ~8.1km
+    page: hourly_s1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: false
+    reason: >
+      fukui-kanko-trend-data tracks Fukui municipalities only, and no Osaka
+      equivalent of its Google Business Profile metrics was found. (The Kyoto
+      'RSI' link suggested, data.city.kyoto.lg.jp dataset 00618, is road
+      damage data.)
+
+  hotel:
+    enabled: false
+    reason: >
+      The code4fukui reservation repos cover Fukui areas only; no daily Osaka
+      reservation feed was found (the Kyoto sites suggested are paid Airbnb
+      data). Hotel availability comes from the rakuten source below.
+
+  survey:
+    enabled: false
+    reason: >
+      No open visitor survey with daily responses was found for Osaka; the
+      prefecture publishes annual tourism reports only.
+
+  traffic:
+    enabled: true
+    layer: t_travospublic_measure_1h  # permanent counter layer, not CCTV
+    point_code: 6110450
+    distance_km: 5.3
+    reason: >
+      Included but flagged: permanent counter ~5.3km away, queried live
+      2026-09-27. NOT confirmed to sit on the road visitors use to reach the
+      site.
+
+  monthly_visitors:
+    enabled: true
+    city_lgcode: 27104  # 此花区; the statistics have wards, not the whole city
+    pref_lgcode: 27
+
+  rakuten:
+    enabled: true
+    search_radius_km: 1  # dense city: 3km circles would overlap the neighbouring nodes
+    lead_days: [1, 7, 30]
+    adult_num: 2

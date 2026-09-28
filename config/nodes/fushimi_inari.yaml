@@ -1,0 +1,68 @@
+node_key: fushimi_inari
+label: "Fushimi Inari Taisha (伏見稲荷大社)"
+coordinates:
+  lat: 34.9671
+  lon: 135.7727  # main gate
+
+sources:
+  # Kyoto node. Same source layout as the Fukui nodes, but code4fukui's
+  # camera, RSI, hotel and survey datasets are Fukui-only and no Kyoto
+  # equivalent was found (see docs/osaka_kyoto_sources.md), so those are
+  # disabled rather than filled with another prefecture's data.
+  camera:
+    enabled: false
+    reason: >
+      fukui-kanko-people-flow-data covers Fukui sensors only, and no public
+      people-counting camera data was found for Fushimi Inari Taisha (checked
+      2026-09-27).
+
+  weather:
+    enabled: true
+    station_name: "京都 (Kyoto)"
+    prec_no: "61"  # 京都府
+    block_no: "47759"  # nearest full-observation JMA station, ~6.4km
+    page: hourly_s1
+    start_date: "2024-12-01"
+
+  rsi:
+    enabled: false
+    reason: >
+      fukui-kanko-trend-data tracks Fukui municipalities only, and no Kyoto
+      equivalent of its Google Business Profile metrics was found. (The Kyoto
+      'RSI' link suggested, data.city.kyoto.lg.jp dataset 00618, is road
+      damage data.)
+
+  hotel:
+    enabled: false
+    reason: >
+      The code4fukui reservation repos cover Fukui areas only; no daily Kyoto
+      reservation feed was found (the Kyoto sites suggested are paid Airbnb
+      data). Hotel availability comes from the rakuten source below.
+
+  survey:
+    enabled: false
+    reason: >
+      No open visitor survey with daily responses was found for Kyoto.
+
+  traffic:
+    enabled: true
+    layer: t_travospublic_measure_1h  # permanent counter layer, not CCTV
+    point_code: 6110300
+    distance_km: 4.2
+    reason: >
+      Included but flagged: permanent counter ~4.2km away, queried live
+      2026-09-27. NOT confirmed to sit on the road visitors use to reach the
+      site. The closer point 6810060 (CCTV, ~2.8km) is already
+      kyoto_station's, so this one keeps the two nodes' traffic signals
+      separate.
+
+  monthly_visitors:
+    enabled: true
+    city_lgcode: 26109  # 伏見区; the statistics have wards, not the whole city
+    pref_lgcode: 26
+
+  rakuten:
+    enabled: true
+    search_radius_km: 1  # dense city: 3km circles would overlap the neighbouring nodes
+    lead_days: [1, 7, 30]
+    adult_num: 2

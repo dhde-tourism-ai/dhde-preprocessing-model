@@ -88,6 +88,7 @@ Everything goes to `output/`, which is not committed.
 | | `{node}_coverage_report.json` | Per source: status, rows, date range, gaps, missing-value rates |
 | `build_integrated.py` | `integrated_fukui_train.parquet` | Six Fukui sites, one row per site per day, up to yesterday: the training table |
 | | `integrated_fukui.parquet` | The same, continued with future bookings, for the app |
+| | `integrated_kyoto*.parquet`, `integrated_osaka*.parquet` | The same for Kyoto and Osaka (`--region kyoto` or `osaka`), same columns |
 | `build_forecast.py` | `forecast_fukui.parquet` / `.csv` | Next 7 days per site: visitors and the site's own count, each with low/high, plus the backtest error |
 | `check_calibration.py` | `calibration_check.csv` | Per site: the visitor factor and how well its count tracks official monthly visitors |
 | `forecast_monthly.py` | `monthly_forecast.csv` | Next 12 months per town, the prefecture and guest-nights |
@@ -101,6 +102,8 @@ Each site is one config file in `config/nodes/`.
 | Fukui (priority six) | `tojinbo`, `fukui_station`, `rainbow_line`, `katsuyama`, `awara_onsen`, `eiheiji` | Integrated table and 7-day forecast. Eiheiji isn't forecast yet (no daily visitor count) |
 | Ishikawa | `kanazawa`, `kaga_onsen`, `komatsu`, `nanao` | See [Ishikawa and Toyama nodes](#ishikawa-and-toyama-nodes) |
 | Toyama | `toyama_station`, `takaoka`, `himi`, `tateyama` | Same |
+| Kyoto | `kyoto_station`, `arashiyama`, `fushimi_inari`, `higashiyama` | Integrated table only. See [Kyoto and Osaka nodes](#kyoto-and-osaka-nodes) |
+| Osaka | `osaka_station`, `namba`, `osaka_castle`, `usj` | Same |
 
 What each Fukui site measures:
 
@@ -122,6 +125,7 @@ What each Fukui site measures:
 | [`docs/integrated_dataset.md`](docs/integrated_dataset.md) | The integrated table's columns and cleaning rules |
 | [`docs/data_gaps.md`](docs/data_gaps.md) | What's missing per site, and what's used instead |
 | [`docs/site_capacity.md`](docs/site_capacity.md) | Official visitor counts, parking and other limits per site |
+| [`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md) | The suggested Osaka and Kyoto sources, and why most aren't usable |
 | [Monthly forecast](#monthly-forecast) (below) | The 12-month forecast |
 
 ---
@@ -365,6 +369,39 @@ change). Fukui nodes can opt in with the same config block.
   Noto earthquake); both Toyama Station cameras have no data
   2023-11-22 → 2023-12-19; the Kanazawa desk's one zero day is
   2024-01-02, the day after the earthquake.
+
+## Kyoto and Osaka nodes
+
+Kyoto: `kyoto_station`, `arashiyama`, `fushimi_inari`, `higashiyama`.
+Osaka: `osaka_station`, `namba`, `osaka_castle`, `usj`. Same config layout
+as the Fukui nodes, and the same rule as Ishikawa and Toyama: only data
+that really exists for the prefecture, never another prefecture's.
+
+| Source | Kyoto and Osaka |
+|---|---|
+| weather | all eight: 京都 (`prec_no: "61"`, block 47759) and 大阪 (`"62"`, 47772), the nearest full-observation stations (1–8km) |
+| traffic | six, 0.5–5.3km, each node on its own point (see below); namba and osaka_castle off (their nearest counters read 0 on 84–87 of the last 91 days) |
+| monthly_visitors | all eight, by ward (the statistics have wards, not the whole cities) |
+| rakuten | all eight, 1km radius |
+| camera, rsi, hotel, survey | none: no open equivalent found, see [`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md) |
+
+- **Rakuten radius is 1km, not 3km.** The sites are 2–4km apart, so 3km
+  circles would overlap and count the same hotels at several nodes.
+- **No two nodes share a traffic point.** The closest CCTV point to
+  Fushimi Inari and Higashiyama is Kyoto Station's (6810060), so those two
+  use their next-nearest point instead of copying Kyoto Station's signal.
+- **Days a traffic counter reads 0 are missing, not 0** (counter down, as
+  with the cameras): in the last 91 days, osaka_station 39, arashiyama 29,
+  kyoto_station 6, and fukui_station 51.
+- **Namba and Osaka Castle share a ward** (中央区, 27128), so their
+  `city_visitors_month` values are the same: it's the ward's total, not
+  each site's.
+- **No daily visitor count yet.** These nodes have no camera or booking
+  count to predict; Rakuten availability is the closest daily demand
+  signal, and it only has history from its first daily run.
+- **Integrated tables:** `python scripts/build_integrated.py --region kyoto`
+  (or `osaka`) writes `integrated_kyoto*.parquet`, with the same columns as
+  Fukui's.
 
 ## Monthly forecast
 

@@ -36,7 +36,7 @@ import pandas as pd
 import requests
 
 from ..config import read_csv_if_exists, resolve_live_path
-from ..validation import SourceReport, unavailable_report, validate_daily
+from ..validation import SourceReport, blank_zero_days, unavailable_report, validate_daily
 
 API_BASE = "https://api.jartic-open-traffic.org/geoserver"
 LAYER = "t_travospublic_measure_1h_img"  # CCTV AI counter, hourly — default layer
@@ -46,6 +46,19 @@ LAYER = "t_travospublic_measure_1h_img"  # CCTV AI counter, hourly — default l
 PERMANENT_LAYER = "t_travospublic_measure_1h"
 DEFAULT_WINDOW_DAYS = 90
 HISTORY_DIR = "jartic_history"  # written by scripts/collect_live.py
+VOLUME_COLS = ["volume_total", "volume_upstream", "volume_downstream"]
+
+
+def _blank_zero_days(daily: pd.DataFrame, notes: list[str]) -> pd.DataFrame:
+    """A national-road counter can't read 0 for a whole real day: 0 means the
+    counter was down (some Osaka and Kyoto points read 0 on a third of days).
+    Blank those days, as the cameras do, so they don't look like traffic
+    collapsing. hours_observed is kept, so the outage is still visible."""
+    daily = daily.astype({c: float for c in VOLUME_COLS if c in daily})
+    daily, n_blanked = blank_zero_days(daily, "volume_total", [c for c in VOLUME_COLS if c in daily])
+    if n_blanked:
+        notes.append(f"{n_blanked} day(s) read 0 vehicles (counter down) and were set to missing")
+    return daily
 
 
 def merge_history(existing: pd.DataFrame | None, new: pd.DataFrame | None) -> pd.DataFrame:
@@ -121,7 +134,7 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     if live_error:
         if history is None:
             return None, SourceReport(source="traffic", node_key=node_key, status="error", notes=notes + [live_error])
-        daily = merge_history(history, None)
+        daily = _blank_zero_days(merge_history(history, None), notes)
         notes += [live_error, f"using saved history only ({len(daily)} days from {history_name})"]
         return daily, validate_daily(daily, source="traffic", node_key=node_key, notes=notes)
 
@@ -148,5 +161,6 @@ def load_traffic(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     else:
         notes.append(f"live API pull, {window_days}-day trailing window only — no saved history found "
                      f"under {HISTORY_DIR}/ (run scripts/collect_live.py on a schedule)")
+    daily = _blank_zero_days(daily, notes)
     report = validate_daily(daily, source="traffic", node_key=node_key, notes=notes)
     return daily, report

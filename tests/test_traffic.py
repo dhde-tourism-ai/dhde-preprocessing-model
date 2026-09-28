@@ -166,3 +166,19 @@ def test_history_path_is_not_mangled_for_s3(monkeypatch):
     monkeypatch.setattr(traffic.requests, "get", lambda *a, **k: _FakeResponse({"features": [_feature("202401010800")]}))
     traffic.load_traffic({"node_key": "x", "sources": {"traffic": {"enabled": True, "point_code": 1, "distance_km": 1}}})
     assert seen == ["s3://bucket/live/jartic_history/x_traffic_daily.csv"]
+
+
+def test_zero_traffic_days_are_blanked_not_kept_as_real_counts(monkeypatch, no_saved_history):
+    # Regression (PR #14 review): osaka_station read 0 on 39 of 90 days and
+    # arashiyama on 29 of 91; kept as 0 they look like traffic collapsing.
+    _write_history(no_saved_history, [["2023-06-01", 0, 0, 0, 24]])
+    features = [_feature("202401010800"), _feature("202401020800", 0, 0, 0, 0)]
+    monkeypatch.setattr(traffic.requests, "get", lambda *a, **k: _FakeResponse({"features": features}))
+    node_cfg = {"node_key": "x", "sources": {"traffic": {"enabled": True, "point_code": 123, "distance_km": 2.0}}}
+    df, report = traffic.load_traffic(node_cfg)
+    df = df.set_index("date")
+    assert df.loc["2024-01-01", "volume_total"] == 2
+    for day in ["2023-06-01", "2024-01-02"]:
+        assert df.loc[day, traffic.VOLUME_COLS].isna().all()
+        assert df.loc[day, "hours_observed"] > 0  # the outage stays visible
+    assert any("2 day(s) read 0 vehicles" in n for n in report.notes)
