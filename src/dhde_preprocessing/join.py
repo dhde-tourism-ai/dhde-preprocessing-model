@@ -19,6 +19,7 @@ from .config import get_workspace_root, load_node_config
 from .validation import SourceReport, print_report
 from .sources.camera import load_camera
 from .sources.footfall_proxy import load_footfall_proxy
+from .sources.google_reviews import load_google_reviews
 from .sources.hotel import load_hotel
 from .sources.info_desk import load_info_desk
 from .sources.monthly_visitors import load_monthly_visitors
@@ -42,16 +43,17 @@ SOURCE_LOADERS = {
     "road_congestion": load_road_congestion,  # TomTom, congestion ratio for every node
     "footfall_proxy": load_footfall_proxy,  # camera-less nodes only, see module docstring
     "visitor_reservation": load_visitor_reservation,  # attraction entry bookings, where a feed exists
+    "google_reviews": load_google_reviews,  # new Google Maps reviews per day, where a place_id is set
     # survey is handled separately below — it's response-level, not date-unique
 }
 
 # Sources only some nodes declare (info_desk exists for Kanazawa only;
-# monthly_visitors, rakuten, road_congestion, footfall_proxy and
-# visitor_reservation are opt-in per node). Skipped entirely when absent from
+# monthly_visitors, rakuten, road_congestion, footfall_proxy,
+# visitor_reservation and google_reviews are opt-in per node). Skipped entirely when absent from
 # a node's config, so existing nodes' output and coverage reports don't
 # change until their config opts in.
 OPTIONAL_SOURCES = {"info_desk", "monthly_visitors", "rakuten",
-                    "road_congestion", "footfall_proxy", "visitor_reservation"}
+                    "road_congestion", "footfall_proxy", "visitor_reservation", "google_reviews"}
 
 
 def _run_loader(source_name: str, loader, node_cfg: dict):
