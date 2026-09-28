@@ -23,7 +23,10 @@ target up to d - 7 (`MIN_LAG`), so a forecast for any of the next 7 days
 needs nothing later than the day it's made. Calendar features are known
 in advance, and so is `booked_lead7`: bookings for day d as of 7+ days
 before it (Katsuyama: museum entries, which also show the closing days
-ahead of time; Awara Onsen: hotel guests from the cleaned booking curve). Weather, hotel and RSI are left out
+ahead of time; Awara Onsen: hotel guests, read from the raw snapshots
+because the hotel cleaning looks at later ones). If a feed is late and a
+forecast day has no week-ahead value, the regression falls back to its
+version without it and the row is flagged (`week_ahead_missing`). Weather, hotel and RSI are left out
 for now: at forecast time we only have weather *forecasts*, hotel
 bookings *so far* (the training table holds final bookings, and hotel.py
 doesn't yet expose a week-ahead value) and RSI five days late.
@@ -154,31 +157,50 @@ def build_features(y: pd.Series, extra_days: int = 0) -> pd.DataFrame:
 
 # --- models ---------------------------------------------------------------
 
-def _regression_matrix(f: pd.DataFrame) -> pd.DataFrame:
+def _regression_matrix(f: pd.DataFrame, ahead: list[str]) -> pd.DataFrame:
+    """Design matrix. `ahead` (the node's KNOWN_AHEAD features) is fixed per
+    node, never inferred from which values happen to be present, so train
+    and test always have the same columns."""
     x = f[["is_day_off", "off_run_len", "prev_day_off", "next_day_off", "is_golden_week",
            "is_obon", "is_new_year", "same_weekday_mean", "roll28", "lag7_day_off"]].copy()
     x["same_weekday_mean"] = x["same_weekday_mean"].fillna(x["roll28"])
     x["lag7_day_off"] = x["lag7_day_off"].fillna(0)
-    for col in KNOWN_AHEAD_FEATURES:  # only for nodes that have it
-        if f[col].notna().any():
-            x[col] = f[col]
+    for col in ahead:
+        x[col] = f[col]
     dow = pd.get_dummies(f["dow"].astype(pd.CategoricalDtype(range(7))), prefix="dow", drop_first=True)
     month = pd.get_dummies(f["month"].astype(pd.CategoricalDtype(range(1, 13))), prefix="m", drop_first=True)
     return pd.concat([x, dow, month], axis=1).astype(float)
 
 
+def _fit_ridge(tr: pd.DataFrame, ahead: list[str]) -> Ridge | None:
+    x = _regression_matrix(tr, ahead)
+    ok = x.notna().all(axis=1)
+    return Ridge(alpha=1.0).fit(x[ok], np.log1p(tr.loc[ok, "y"])) if ok.sum() >= 30 else None
+
+
 def fit_predict_regression(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
-    """One ridge regression per node, on log1p(target)."""
+    """One ridge regression per node, on log1p(target).
+
+    Nodes with week-ahead features get two fits: with them, and without
+    them. A test day with its week-ahead value uses the first; a day
+    without one (a late feed) uses the second instead of failing or
+    returning NaN.
+    """
     pred = pd.Series(np.nan, index=test.index)
     for node_key, tr in train.groupby("node_key"):
         te = test[test["node_key"] == node_key]
-        xtr, xte = _regression_matrix(tr), _regression_matrix(te)
-        ok = xtr.notna().all(axis=1)
-        if te.empty or ok.sum() < 30:
+        if te.empty:
             continue
-        model = Ridge(alpha=1.0).fit(xtr[ok], np.log1p(tr.loc[ok, "y"]))
-        usable = xte.notna().all(axis=1)
-        pred[te.index[usable]] = np.expm1(model.predict(xte[usable]))
+        ahead = list(KNOWN_AHEAD.get(node_key, {}))
+        for cols in ([ahead] if ahead else []) + [[]]:  # full model first, then the fallback
+            todo = te.index[pred[te.index].isna()]
+            model = _fit_ridge(tr, cols)
+            if model is None or todo.empty:
+                continue
+            x = _regression_matrix(te.loc[todo], cols)
+            usable = x.notna().all(axis=1)
+            if usable.any():
+                pred[todo[usable.to_numpy()]] = np.expm1(model.predict(x[usable]))
     return pred.to_numpy()
 
 
@@ -330,13 +352,28 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
             "target": TARGETS[node_key][1], "model": row["model"],
             "visitors_est": to_visitors(pred), "visitors_low": to_visitors(low), "visitors_high": to_visitors(high),
             "calibration_factor": factor,
+            # True when the node uses week-ahead bookings but they weren't there for this day
+            "week_ahead_missing": (future[list(KNOWN_AHEAD[node_key])].isna().any(axis=1).to_numpy()
+                                   if node_key in KNOWN_AHEAD else False),
             "predicted": np.round(pred), "low": np.round(low), "high": np.round(high),
             "backtest_wape": round(row["wape"], 4),
             "baseline_wape": round(baseline.loc[node_key, "wape"], 4),
             "range_coverage": round(row["coverage_holdout"], 3),
         }))
     fc = pd.concat(out, ignore_index=True)
+    warnings = []
+    for node_key, cols in KNOWN_AHEAD.items():
+        seen = feats.loc[(feats["node_key"] == node_key) & feats["y"].notna(), list(cols)]
+        if not seen.empty and seen.isna().all().any():
+            warnings.append(f"{node_key}: no week-ahead bookings in the input ({', '.join(cols.values())}), so it was "
+                            f"forecast without them and scores worse; rebuild the node tables with this code "
+                            f"(build_node.py, then build_integrated.py)")
+    if fc["week_ahead_missing"].any():
+        late = fc.loc[fc["week_ahead_missing"], ["node_key", "date"]]
+        warnings.append(f"{len(late)} forecast day(s) had no week-ahead bookings (late feed?) and used the "
+                        f"model without them: " + ", ".join(f"{n} {d.date()}" for n, d in late.itertuples(index=False)))
     report = {
+        "warnings": warnings,
         "backtest_weeks": weeks, "horizon_days": HORIZON, "interval": list(INTERVAL),
         "chosen_model": best["model"].to_dict(),
         "calibration": calib,

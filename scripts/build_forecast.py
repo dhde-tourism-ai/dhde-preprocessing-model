@@ -51,6 +51,8 @@ def main() -> None:
         print(f"  {node_key}: {model}, visitors = count {conv}")
     for node_key, reason in PENDING.items():
         print(f"  {node_key}: pending ({reason})")
+    for warning in report["warnings"]:
+        print(f"  WARNING: {warning}")
     write_forecast(fc, scores, report, output_dir=args.output_dir)
 
 

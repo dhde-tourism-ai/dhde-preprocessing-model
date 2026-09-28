@@ -98,3 +98,49 @@ def test_forecast_reports_visitors_next_to_the_measured_count():
     factor = report["calibration"]["tojinbo"]["factor"]
     assert factor and np.isclose(row["visitors_est"], round(row["predicted"] * factor), atol=1)
     assert row["visitors_low"] <= row["visitors_est"] <= row["visitors_high"]
+
+
+def _with_bookings(missing_forecast_days):
+    """Synthetic table where Katsuyama has week-ahead bookings, plus a full
+    table running 7 days on, with some of those days' bookings missing."""
+    table = _table()
+    k = table["node_key"] == "katsuyama"
+    table.loc[k, "attraction_reserved_visitors_lead7"] = table.loc[k, "attraction_reserved_visitors"] * 0.8
+    last = table["date"].max()
+    future = pd.DataFrame({"date": pd.date_range(last + pd.Timedelta(days=1), periods=HORIZON), "node_key": "katsuyama"})
+    future["attraction_reserved_visitors_lead7"] = 900.0
+    future.loc[future.index[:missing_forecast_days], "attraction_reserved_visitors_lead7"] = np.nan
+    return table, pd.concat([table, future], ignore_index=True)
+
+
+def test_a_late_booking_feed_falls_back_instead_of_crashing():
+    """Regression test (PR #13 review): with bookings missing on every
+    forecast day, the regression raised 'feature names should match' and
+    the whole run failed; with some missing, those days came out NaN."""
+    for missing in (HORIZON, 3):
+        table, full = _with_bookings(missing)
+        fc, _, report = forecast(table, weeks=4, full=full)
+        k = fc[fc["node_key"] == "katsuyama"]
+        assert k["predicted"].notna().all()
+        assert k["week_ahead_missing"].sum() == missing
+        assert any("no week-ahead bookings" in w for w in report["warnings"])
+
+
+def test_warns_when_week_ahead_columns_are_missing_from_the_input():
+    """Node tables built without the week-ahead columns (e.g. from main before
+    this PR) must say so, not silently score worse."""
+    _, _, report = forecast(_table(), weeks=4)
+    assert any("katsuyama: no week-ahead bookings in the input" in w for w in report["warnings"])
+
+
+def test_regression_itself_covers_days_without_week_ahead_bookings():
+    """The end-to-end test above can pick LightGBM, which tolerates gaps, so
+    check the regression directly: it raised with every forecast day missing,
+    and returned NaN for the missing ones otherwise."""
+    from dhde_preprocessing.forecast import _trainable, fit_predict_regression
+    for missing in (HORIZON, 3):
+        table, full = _with_bookings(missing)
+        feats = feature_table(table, extra_days=HORIZON, full=full)
+        future = feats[(feats["node_key"] == "katsuyama") & (feats["date"] > table["date"].max())]
+        pred = fit_predict_regression(_trainable(feats), future)
+        assert not np.isnan(pred).any()
