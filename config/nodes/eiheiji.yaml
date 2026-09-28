@@ -4,6 +4,13 @@ coordinates:
   lat: 36.0567754
   lon: 136.3568759  # 大本山 永平寺 エリア, area.csv 親番号 300025
 
+# Official annual visitors (観光客入込数, gross visits), used to convert a
+# forecast's measured count into visitors. See docs/site_capacity.md.
+official_visitors:
+  year: 2025
+  count: 518000
+  source: "https://www.pref.fukui.lg.jp/doc/kankou/fukuiken-kankoukyakusu_d/fil/024.pdf"
+
 sources:
   camera:
     enabled: false

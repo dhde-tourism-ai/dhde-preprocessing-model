@@ -4,6 +4,14 @@ coordinates:
   lat: 36.0614
   lon: 136.2217
 
+# Official annual visitors (観光客入込数, gross visits), used to convert a
+# forecast's measured count into visitors. See docs/site_capacity.md.
+official_visitors:
+  year: 2025
+  count: null
+  source: "https://www.pref.fukui.lg.jp/doc/kankou/fukuiken-kankoukyakusu_d/fil/024.pdf"
+  note: "not broken out in the prefecture's figures (Fukui City total only), so no visitor conversion"
+
 sources:
   camera:
     enabled: true

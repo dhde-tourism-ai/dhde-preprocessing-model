@@ -57,7 +57,6 @@ sources:
 
   monthly_visitors:
     enabled: true
-    repo: japan-kanko-stat
     city_lgcode: 16201
     pref_lgcode: 16
 

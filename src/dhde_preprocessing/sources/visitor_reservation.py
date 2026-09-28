@@ -18,6 +18,13 @@ it. Treat it as a strong daily demand signal, not the full headcount.
 A zero on the visit day is kept as zero (closure days); where the lead-0
 snapshot is missing, the latest earlier snapshot is used and flagged in
 `from_earlier_snapshot` so nothing is silently patched.
+
+`reserved_visitors_lead7` is what was booked for that day as of 7 days
+before it (the snapshot with the smallest lead of at least 7): a value
+already known a week ahead, so a forecast can use it without leaking the
+final count. It also shows closures ahead of time: the museum's closing
+days (2nd and 4th Wednesday) read 0 while open days already have
+thousands booked. Empty when no snapshot 7+ days ahead exists.
 """
 from __future__ import annotations
 
@@ -67,6 +74,9 @@ def load_visitor_reservation(node_cfg: dict) -> tuple[pd.DataFrame | None, Sourc
     out = best[["date", "n_people", "amount_fee"]].rename(
         columns={"n_people": "reserved_visitors", "amount_fee": "reserved_fee"})
     out["from_earlier_snapshot"] = best["lead"].to_numpy() > 0
+    week_ahead = snaps[snaps["lead"] >= 7].sort_values("lead").drop_duplicates("date", keep="first")
+    out = out.merge(week_ahead[["date", "n_people"]].rename(columns={"n_people": "reserved_visitors_lead7"}),
+                    on="date", how="left")
     out = out.sort_values("date").reset_index(drop=True)
 
     latest = snaps["snapshot"].max()
