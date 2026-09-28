@@ -179,6 +179,15 @@ and variables → Actions); without it only JARTIC is collected. Scheduled
 workflows only run from the default branch, so collection starts once this is
 merged to main.
 
+**Google reviews** work the same way: `scripts/collect_google_reviews.py`
+runs the Apify Google Maps Reviews Scraper weekly on Mondays
+(`.github/workflows/collect-google-reviews.yml`, needs the `APIFY_TOKEN`
+secret) and appends new reviews to `google_reviews/` on `live-data`. Only
+the date, stars, language and yes/no flags are kept, never names or review
+text, because the branch is public. To load an export someone ran by hand:
+`python scripts/collect_google_reviews.py --out history --import FILE.csv --max-reviews 1000`.
+Nodes opt in with a `google_reviews.place_id` in their config.
+
 ## Non-obvious things found while building this — read before extending
 
 - **`config.resolve_path`** is the only way any source module touches the

@@ -69,3 +69,7 @@ sources:
   road_congestion:
     enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
     radius_km: 2
+
+  google_reviews:
+    enabled: true  # Apify Google Maps Reviews Scraper, needs APIFY_TOKEN; see sources/google_reviews.py
+    place_id: "ChIJY1v1P_DdAWARwMvznJtMeMo"  # Google Maps: Rainbow Line

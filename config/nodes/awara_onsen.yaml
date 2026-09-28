@@ -60,3 +60,10 @@ sources:
   road_congestion:
     enabled: true  # TomTom Orbis flow tiles, needs TOMTOM_API_KEY; see sources/road_congestion.py
     radius_km: 2
+
+  google_reviews:
+    enabled: false
+    reason: >
+      Not scraped yet. Awara Onsen is a town of ryokan, not one place on
+      Google Maps: pick the place (or places) that stand for it and add
+      its place_id here.

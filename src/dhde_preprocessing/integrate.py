@@ -79,6 +79,7 @@ SOURCE_PREFIX = {
     "road_congestion": "road_",
     "footfall_proxy": "proxy_",
     "visitor_reservation": "attraction_",
+    "google_reviews": "reviews_",
 }
 FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope", "weather_station"]
 
@@ -88,7 +89,7 @@ FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope",
 # history), and Fukui, Kyoto and Osaka tables line up. An expected column
 # with no data at all is a warning in the report, not a missing column.
 EXPECTED_COLUMNS = FRONT_COLUMNS + [
-    "has_camera", "has_footfall_proxy", "has_hotel", "has_monthly_visitors", "has_rakuten",
+    "has_camera", "has_footfall_proxy", "has_google_reviews", "has_hotel", "has_monthly_visitors", "has_rakuten",
     "has_road_congestion", "has_rsi", "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
     "camera_count", "camera_gate1_vehicle_count", "camera_gate2_vehicle_count",
     "weather_precip", "weather_temp", "weather_wind", "weather_sun", "weather_humidity", "weather_snow_depth",
@@ -109,6 +110,9 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "city_visitors_month", "pref_visitors_month",
     "rakuten_vacant_share_d1", "rakuten_min_charge_d1", "rakuten_vacant_share_d7", "rakuten_min_charge_d7",
     "rakuten_vacant_share_d30", "rakuten_min_charge_d30",
+    "reviews_new", "reviews_stars_mean", "reviews_stars_1", "reviews_stars_2", "reviews_stars_3",
+    "reviews_stars_4", "reviews_stars_5", "reviews_with_text", "reviews_foreign",
+    "reviews_rating_total", "reviews_count_total",
 ]
 
 SURVEY_COUNT = "survey_response_count"
