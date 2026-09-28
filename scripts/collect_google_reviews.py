@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -93,11 +94,23 @@ def scrape(place_id: str, since: str | None, max_reviews: int, token: str) -> pd
     return pd.DataFrame(items)
 
 
-def store(items: pd.DataFrame, place_id: str, node_key: str, max_reviews: int | None, since: str | None) -> None:
-    items = items[items.get("placeId", pd.Series(dtype=object)) == place_id]
-    if items.empty or "reviewId" not in items:
-        print(f"  {node_key}: no reviews returned")
+def store(items: pd.DataFrame, place_id: str, node_key: str, max_reviews: int | None, since: str | None,
+          live: bool = False) -> None:
+    """Add one place's reviews to its logs. `live` is a scraper run made just now:
+    with no reviews it still records the days it covered (0 reviews, not missing).
+    An import without the place says nothing about it, so nothing is recorded."""
+    p_items = items[items["placeId"] == place_id] if "placeId" in items else items.iloc[0:0]
+    if "reviewId" in p_items:
+        p_items = p_items[p_items["reviewId"].notna()]
+    if p_items.empty or "reviewId" not in p_items:
+        if not live:
+            print(f"  {node_key}: not in the import")
+            return
+        run = gr.empty_run(items, place_id, datetime.now(gr.JST).date().isoformat(), since)
+        _, total = gr.append(node_key, pd.DataFrame(columns=gr.REVIEW_COLS), run)
+        print(f"  {node_key}: no new reviews, {total} in the log; covers {run['covered_from']} to {run['covered_to']}")
         return
+    items = p_items
     reviews = gr.normalize(items)
     run = gr.run_summary(items, reviews, place_id, max_reviews, since)
     added, total = gr.append(node_key, reviews, run)
@@ -135,7 +148,8 @@ def main() -> int:
     for place_id, node_key in places.items():
         since = gr.since_date(node_key)
         try:
-            store(scrape(place_id, since, args.max_reviews, token), place_id, node_key, args.max_reviews, since)
+            store(scrape(place_id, since, args.max_reviews, token), place_id, node_key, args.max_reviews, since,
+                  live=True)
         except Exception as e:  # noqa: BLE001 - one failed place shouldn't lose the others
             failures += 1
             print(f"  {node_key}: failed this run: {e}")

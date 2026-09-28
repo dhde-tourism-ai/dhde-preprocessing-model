@@ -116,6 +116,24 @@ def run_summary(items: pd.DataFrame, reviews: pd.DataFrame, place_id: str,
     }
 
 
+def empty_run(items: pd.DataFrame, place_id: str, run_date: str, since: str | None) -> dict:
+    """The run_log row for a run that found no new reviews for a place.
+
+    It still covers `since` to the day before the run, so those days read
+    0 reviews instead of missing. The place's totals are kept when the
+    scraper returned a place row without reviews; otherwise they stay missing.
+    """
+    p_items = items[items["placeId"] == place_id] if "placeId" in items else items.iloc[0:0]
+    first = p_items.iloc[0] if len(p_items) else {}
+    return {
+        "run_date": run_date, "place_id": place_id, "fetched": 0, "capped": False,
+        "covered_from": since,
+        "covered_to": (pd.Timestamp(run_date) - timedelta(days=1)).date().isoformat(),
+        "rating_total": pd.to_numeric(first.get("totalScore"), errors="coerce"),
+        "count_total": pd.to_numeric(first.get("reviewsCount"), errors="coerce"),
+    }
+
+
 def append(node_key: str, reviews: pd.DataFrame, run: dict) -> tuple[int, int]:
     """Add one run to a node's logs; returns (new reviews, reviews in the log).
 
@@ -125,7 +143,8 @@ def append(node_key: str, reviews: pd.DataFrame, run: dict) -> tuple[int, int]:
     path = review_log_path(node_key)
     old = read_csv_if_exists(path)
     before = set(old["review_hash"]) if old is not None else set()
-    log = pd.concat([old, reviews], ignore_index=True) if old is not None else reviews
+    parts = [df for df in (old, reviews) if df is not None and not df.empty]
+    log = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=REVIEW_COLS)
     log = log.drop_duplicates("review_hash", keep="last").sort_values("published_at")
     write_csv(log[REVIEW_COLS], path)
 
@@ -195,10 +214,12 @@ def load_google_reviews(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceRepo
 
     reviews = read_csv_if_exists(review_log_path(node_key))
     runs = read_csv_if_exists(run_log_path(node_key))
-    if reviews is None or runs is None or reviews.empty:
+    if runs is None or runs.empty:
         return None, SourceReport(source="google_reviews", node_key=node_key, status="error",
                                    notes=["no review log yet: run scripts/collect_google_reviews.py, "
                                           "or point DHDE_LIVE_DATA_ROOT at a checkout of the live-data branch"])
+    if reviews is None:
+        reviews = pd.DataFrame(columns=REVIEW_COLS)
 
     daily = to_daily(reviews, runs)
     latest = runs.iloc[-1]
