@@ -3,9 +3,9 @@
 Per-node data preprocessing for the DHDE (Distributed Human Data Engine)
 tourism dashboard covering Fukui/Hokuriku, Japan. This package's job stops
 at: **raw source → cleaned, validated, date-keyed table → one joined
-master table per node.** It does not build 0–100 normalized scores or any
-forecasting/predicted values — that's a separate modeling/scoring stage
-that consumes this pipeline's output.
+master table per node.** It does not build 0–100 normalized scores. It
+also holds the forecasts that ship in the same daily build: the monthly
+one (see "Monthly forecast" below) and the 7-day one (`docs/forecast.md`).
 
 ## Quickstart
 
@@ -278,6 +278,40 @@ change). Fukui nodes can opt in with the same config block.
   Noto earthquake); both Toyama Station cameras have no data
   2023-11-22 → 2023-12-19; the Kanazawa desk's one zero day is
   2024-01-02, the day after the earthquake.
+
+## Monthly forecast
+
+```bash
+python scripts/forecast_monthly.py   # writes output/monthly_forecast.csv + _backtest.csv
+```
+
+12 months ahead, for visitors in each Fukui node's municipality (Rainbow
+Line = Mihama + Wakasa), Fukui prefecture's visitors, and Fukui
+guest-nights (total, Japanese, foreign). It downloads its own two
+sources, so it doesn't need `build_node.py` first: the JTTA (日本観光振興協会) digital
+tourism statistics (`sources/monthly_visitors.py`) and the JTA
+accommodation survey's 推移表 workbook (`sources/guest_nights.py`,
+prefecture-level only, about two months behind).
+
+Each series gets whichever model backtests best (rolling-origin, scored
+only on months after the forecast origin): the same month last year, or
+that plus half of the recent year-on-year growth, either its own or
+Ishikawa's and Toyama's. `low`/`high` are the 10th–90th percentile of the
+chosen model's backtest errors. Details and thresholds are in
+`src/dhde_preprocessing/monthly_forecast.py`.
+
+- **Fukui's visitor counts are only comparable from 2025-01.** The
+  publisher's April 2026 tourism-point revision didn't reach back, so
+  2024 and earlier count fewer points (Fukui 1.65x in 2025 vs 1.09x
+  nationally). That leaves too little history to test the growth
+  models, so visitor series use last year's month for now; the choice is
+  re-tested on every run.
+- **Guest-nights** use 2023-01 onward (after COVID). JTA changed its
+  sampling in 2026-01, so year-on-year changes across it are partly
+  method.
+- As of the 2026-08 data, backtest MAPE is about 9–17% for the node
+  municipalities, 9% for the prefecture and 9–10% for guest-nights
+  (17% for foreign guest-nights, a small and volatile series).
 
 ## Why survey is handled differently from the other five sources
 
