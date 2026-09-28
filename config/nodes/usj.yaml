@@ -57,7 +57,6 @@ sources:
 
   monthly_visitors:
     enabled: true
-    repo: japan-kanko-stat
     city_lgcode: 27104  # 此花区; the statistics have wards, not the whole city
     pref_lgcode: 27
 

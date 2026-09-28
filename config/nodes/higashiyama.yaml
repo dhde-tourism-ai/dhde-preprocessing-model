@@ -58,7 +58,6 @@ sources:
 
   monthly_visitors:
     enabled: true
-    repo: japan-kanko-stat
     city_lgcode: 26105  # 東山区; the statistics have wards, not the whole city
     pref_lgcode: 26
 

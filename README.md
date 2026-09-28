@@ -305,6 +305,9 @@ that really exists for the prefecture, never another prefecture's.
 - **No two nodes share a traffic point.** The closest CCTV point to
   Fushimi Inari and Higashiyama is Kyoto Station's (6810060), so those two
   use their next-nearest point instead of copying Kyoto Station's signal.
+- **Days a traffic counter reads 0 are missing, not 0** (counter down, as
+  with the cameras): in the last 91 days, osaka_station 39, arashiyama 29,
+  kyoto_station 6, and fukui_station 51.
 - **Namba and Osaka Castle share a ward** (中央区, 27128), so their
   `city_visitors_month` values are the same: it's the ward's total, not
   each site's.
