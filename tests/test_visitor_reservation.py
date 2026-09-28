@@ -45,3 +45,20 @@ def test_uses_visit_day_snapshot_and_flags_fallback(repo):
     assert df.loc["2025-01-02", "bookings_final"]
     assert not df.loc["2025-01-03", "bookings_final"]
     assert any("empty snapshot" in n for n in report.notes)
+
+
+def test_week_ahead_bookings_use_a_snapshot_at_least_7_days_early(monkeypatch, tmp_path):
+    """reserved_visitors_lead7 feeds the forecast, so it must only use a
+    snapshot taken 7+ days before the visit, never a later, fuller one."""
+    monkeypatch.setattr(vr, "resolve_path", lambda p: str(tmp_path / p))
+    data = tmp_path / "dino" / "data"
+    data.mkdir(parents=True)
+    for snap, booked in [("2025-01-01", 100), ("2025-01-03", 200), ("2025-01-10", 900)]:
+        pd.DataFrame([["2025-01-10", booked, 0]], columns=["date_visit", "n_people", "amount_fee"]).to_csv(
+            data / f"{snap}.csv", index=False)
+    pd.DataFrame([["2025-01-05", 5, 0]], columns=["date_visit", "n_people", "amount_fee"]).to_csv(
+        data / "2025-01-04.csv", index=False)
+    df = vr.load_visitor_reservation(_cfg())[0].set_index("date")
+    assert df.loc["2025-01-10", "reserved_visitors"] == 900      # visit day
+    assert df.loc["2025-01-10", "reserved_visitors_lead7"] == 200  # 2025-01-03 (lead 7), not 01-01 (lead 9)
+    assert pd.isna(df.loc["2025-01-05", "reserved_visitors_lead7"])  # no snapshot 7+ days ahead
