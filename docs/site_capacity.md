@@ -16,7 +16,7 @@ https://www.pref.fukui.lg.jp/doc/kankou/fukuiken-kankoukyakusu.html)
 |---|---|---|---|---|
 | Tojinbo | 651k (778k in 2024) | None: city lot closed since 2023-07 for redevelopment | Sightseeing boats: 4 x 69 passengers, every 15-20 min, Apr-Oct | New lot planned at 18,000 m², no car count or opening date |
 | Awara Onsen | 658k | 165 (Yunomachi Station south lot) | Monthly ryokan guests in the city white paper; peak 76,624 in Aug 2025 | Total ryokan rooms not published |
-| Katsuyama | 1,562k area; museum 1.30M (FY2025) | ~1,400 cars (museum site; fuku-e says 1,500) | Timed-entry tickets, daily cap not published | Entry bookings are in the pipeline (visitor_reservation) |
+| Katsuyama | 1,562k area; museum 1,298,975 (FY2025, [Chunichi](https://biz.chunichi.co.jp/news/article/10/124006/)) | ~1,400 cars (museum site; fuku-e says 1,500) | Timed-entry tickets, daily cap not published | Entry bookings are in the pipeline (visitor_reservation) |
 | Eiheiji | 518k | 3 town lots, counts not published | | Unofficial ~50 / 60 / 70 cars; lots 2-3 weekends only |
 | Fukui Station | Not broken out (Fukui City 4,014k) | 200 (west exit underground lot) | 12 downtown lots, 2,065 spaces in total | |
 | Rainbow Line | 443k | 200 across lots 1 and 2 (tourism sites; no official split) | Lift ~450/hour each way; cable car 30 per car | Cameras count vehicles at these same lots |

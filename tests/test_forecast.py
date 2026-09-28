@@ -185,3 +185,13 @@ def test_a_backtest_too_short_to_check_the_range_does_not_crash():
     fc, scores, _ = forecast(_table(), weeks=1)
     assert scores["coverage_holdout"].isna().all()
     assert fc["predicted"].notna().all()
+
+
+def test_visitor_factor_can_use_a_fiscal_year():
+    """Katsuyama's official figure is the museum's FY (April to March), so the
+    count must be averaged over the same days, not the calendar year."""
+    from dhde_preprocessing.forecast import calibration
+    dates = pd.date_range("2025-01-01", "2026-06-30")
+    y = pd.Series(np.where(dates < pd.Timestamp("2025-04-01"), 10.0, 100.0), index=dates)
+    info = calibration(y, {"official_visitors": {"period": ["2025-04-01", "2026-03-31"], "count": 73_000}})
+    assert np.isclose(info["factor"], 73_000 / (100 * 365))  # January-March 2025 (10/day) is outside the FY
