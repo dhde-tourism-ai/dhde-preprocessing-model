@@ -278,5 +278,5 @@ def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFr
             "comparable_from"]
     forecast = pd.concat(out, ignore_index=True)[cols] if out else pd.DataFrame(columns=cols)
     for c in ("predicted", "low", "high"):
-        forecast[c] = forecast[c].round(0)
+        forecast[c] = pd.to_numeric(forecast[c]).round(0)  # an empty frame's columns are object dtype
     return forecast, pd.DataFrame(scores), notes
