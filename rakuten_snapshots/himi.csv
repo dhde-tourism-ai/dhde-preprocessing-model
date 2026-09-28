@@ -1,0 +1,4 @@
+snapshot_date,stay_date,lead_days,hotels_listed,hotels_vacant,min_charge
+2026-09-28,2026-09-29,1,19,8,12000.0
+2026-09-28,2026-10-05,7,19,11,12000.0
+2026-09-28,2026-10-28,30,19,9,12000.0
