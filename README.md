@@ -288,7 +288,7 @@ python scripts/forecast_monthly.py   # writes output/monthly_forecast.csv + _bac
 12 months ahead, for visitors in each Fukui node's municipality (Rainbow
 Line = Mihama + Wakasa), Fukui prefecture's visitors, and Fukui
 guest-nights (total, Japanese, foreign). It downloads its own two
-sources, so it doesn't need `build_node.py` first: the JTA digital
+sources, so it doesn't need `build_node.py` first: the JTTA (日本観光振興協会) digital
 tourism statistics (`sources/monthly_visitors.py`) and the JTA
 accommodation survey's 推移表 workbook (`sources/guest_nights.py`,
 prefecture-level only, about two months behind).

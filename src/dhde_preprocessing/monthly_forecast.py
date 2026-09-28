@@ -1,6 +1,6 @@
 """
 Monthly forecast, 12 months ahead: visitors per Fukui node's municipality
-(JTA digital tourism statistics, see sources/monthly_visitors.py) and
+(JTTA digital tourism statistics, see sources/monthly_visitors.py) and
 Fukui guest-nights (JTA accommodation survey, sources/guest_nights.py),
 with Ishikawa and Toyama as candidate leading signals.
 
