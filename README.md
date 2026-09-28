@@ -44,6 +44,9 @@ Then `python scripts/build_forecast.py` forecasts visitors 1 to 7 days
 ahead per node with a low/high range (`output/forecast_fukui.parquet`),
 backtested on the last 26 weeks against "same weekday last week". What's
 forecast, how it's tested and the current scores: [`docs/forecast.md`](docs/forecast.md).
+Each forecast is also given in visitors, with one factor per node;
+`python scripts/check_calibration.py` checks whether that factor is sound
+([`docs/calibration.md`](docs/calibration.md)).
 
 What's missing per node, and what's used instead, is tracked in
 [`docs/data_gaps.md`](docs/data_gaps.md); site capacity data is in

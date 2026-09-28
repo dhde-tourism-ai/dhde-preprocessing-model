@@ -6,11 +6,15 @@ coordinates:
 
 # Official annual visitors (観光客入込数, gross visits), used to convert a
 # forecast's measured count into visitors. See docs/site_capacity.md.
+# The museum's own entries, not the prefecture's Katsuyama area figure
+# (1,562k in calendar 2025): the area figure's monthly pattern doesn't
+# follow the museum's (see docs/calibration.md), so scaling bookings to it
+# would spread other attractions' visitors over the museum's summer peak.
 official_visitors:
-  year: 2025
-  count: 1562000
-  source: "https://www.pref.fukui.lg.jp/doc/kankou/fukuiken-kankoukyakusu_d/fil/024.pdf"
-  note: "Katsuyama area figure; the museum alone reported 1.30M for FY2025 (Apr-Mar)"
+  period: ["2025-04-01", "2026-03-31"]  # FY2025
+  count: 1298975
+  source: "https://biz.chunichi.co.jp/news/article/10/124006/"
+  note: "Fukui Prefectural Dinosaur Museum entries, FY2025 (record; FY2024 was 1,264,541)"
 
 sources:
   camera:

@@ -50,7 +50,7 @@ measured days.
 |---|---|---|---|
 | Tojinbo | 651k | 0.198 | ~5 camera detections per visitor |
 | Rainbow Line | 443k | 6.98 | ~7 visitors per car counted |
-| Katsuyama | 1,562k (area) | 2.05 | ~2 area visitors per museum booking |
+| Katsuyama | 1,299k (museum, FY2025) | 1.76 | bookings are 57% of museum entries |
 | Awara Onsen | 658k | 1.86 | ~1.9 visitors per hotel guest |
 | Fukui Station | none | none | No official site figure, so the forecast stays in camera detections |
 
@@ -59,9 +59,10 @@ official figure, so nodes can be compared in one unit. The day-to-day
 pattern is still the node's own count (overnight guests at Awara, cars at
 Rainbow Line), and an official "visit" is a gross count (one person at two
 sites counts twice). Error percentages are the same in either unit.
-Katsuyama uses the area figure (the museum alone reported 1.30M for
-FY2025, April to March); whether the area or the museum figure fits better
-is open. The app's `build_real_data.py` scales its history with the sum
+Katsuyama uses the museum's own entries over its fiscal year (April to
+March), not the prefecture's area figure: the area's monthly pattern
+doesn't follow the museum's. Whether one factor per node is sound, node by
+node, is in [`calibration.md`](calibration.md). The app's `build_real_data.py` scales its history with the sum
 instead of the mean, which gives slightly higher factors where sensors were
 down (Tojinbo 0.208, Rainbow Line 7.12).
 
