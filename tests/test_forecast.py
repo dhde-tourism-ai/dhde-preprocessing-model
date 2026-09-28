@@ -144,3 +144,12 @@ def test_regression_itself_covers_days_without_week_ahead_bookings():
         future = feats[(feats["node_key"] == "katsuyama") & (feats["date"] > table["date"].max())]
         pred = fit_predict_regression(_trainable(feats), future)
         assert not np.isnan(pred).any()
+
+
+def test_zero_bookings_a_week_ahead_are_marked_as_closed_for_the_regression():
+    from dhde_preprocessing.forecast import _regression_matrix
+    f = build_features(node_target(_table(), "katsuyama"))
+    f["booked_lead7"] = [0.0, np.nan] + [5.0] * (len(f) - 2)
+    x = _regression_matrix(f, ["booked_lead7"])
+    assert x["booked_lead7_is_zero"].iloc[0] == 1 and pd.isna(x["booked_lead7_is_zero"].iloc[1])
+    assert x["booked_lead7_is_zero"].iloc[2] == 0

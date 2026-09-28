@@ -89,8 +89,10 @@ later information can reach it.
 
 - Katsuyama: `attraction_reserved_visitors_lead7` (`visitor_reservation.py`).
   It also shows the museum's closing days (2nd and 4th Wednesday, moved
-  around holidays), because those read 0 while open days already have
-  bookings.
+  around holidays): it reads 0 on exactly its 47 closing days. The
+  regression gets an explicit "nothing booked a week ahead" flag, since a
+  linear model on log bookings can't reach 0 on its own (Katsuyama 16.1% to
+  13.6%).
 - Awara Onsen: `hotel_n_people_lead7` (`hotel.py`). Taken from the raw
   snapshots, not the cleaned booking curve: the cleaning's glitch check
   and gap filling look at later snapshots. The two agree on 99.5% of
@@ -130,11 +132,11 @@ coverage is the real test.
 | Fukui Station | 20.4% | 16.1% | 16.1% | Regression (tie) |
 | Tojinbo | 36.9% | 27.6% | 28.4% | Regression |
 | Rainbow Line | 47.9% | 41.8% | 39.2% | LightGBM |
-| Katsuyama | 64.4% | 16.1% | 25.9% | Regression |
+| Katsuyama | 64.4% | 13.6% | 25.9% | Regression |
 | Awara Onsen | 26.4% | 2.8% | 6.2% | Regression |
 
 Range coverage on unseen weeks, for the model used: Fukui Station 85%,
-Tojinbo 75%, Rainbow Line 92%, Katsuyama 85%, Awara Onsen 81%.
+Tojinbo 75%, Rainbow Line 92%, Katsuyama 90%, Awara Onsen 81%.
 
 **Why Awara Onsen scores so well:** about 96% of its final guests are
 already booked 7 days ahead (median), so the week-ahead bookings alone
@@ -161,7 +163,16 @@ were measured on a different window; on this one the baseline is
   it as those hotels' guests, not the town's total.
 - **Rainbow Line** is small and lumpy (tens to hundreds of cars, many
   zero days in winter), so percentage errors stay large.
-- **Weather forecasts** are the next feature to add.
+- **Weather forecasts** are the next feature to add (rain for the museum,
+  wind, rain and snow for Rainbow Line).
+- **School holidays** helped a little in a test (Fukui Station 16.1% to
+  15.3%) but only with approximate national dates, so they're left out
+  until Fukui Prefecture's official school calendar is in.
+- **Rainbow Line zero days:** 42 of its 47 zero days are in January and
+  February, likely winter closures, but nothing tells the model in
+  advance. A published closure calendar would help. Gate 2 reads 0 on 401
+  days, so summing the gates barely changes the count; the ~7 visitors per
+  car factor still needs checking (buses, or visitors the gates don't see).
 - **Eiheiji** stays pending until a real visitor count exists. The temple
   charges admission, so its own counts are the likely source; the request
   goes through the team lead.

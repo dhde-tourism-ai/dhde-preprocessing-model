@@ -167,6 +167,9 @@ def _regression_matrix(f: pd.DataFrame, ahead: list[str]) -> pd.DataFrame:
     x["lag7_day_off"] = x["lag7_day_off"].fillna(0)
     for col in ahead:
         x[col] = f[col]
+        # Nothing booked a week ahead = closed (Katsuyama: exactly its 47 closing days).
+        # A linear model on log bookings can't reach 0 on its own; this lets it.
+        x[f"{col}_is_zero"] = (f[col] == 0).astype(float).where(f[col].notna())
     dow = pd.get_dummies(f["dow"].astype(pd.CategoricalDtype(range(7))), prefix="dow", drop_first=True)
     month = pd.get_dummies(f["month"].astype(pd.CategoricalDtype(range(1, 13))), prefix="m", drop_first=True)
     return pd.concat([x, dow, month], axis=1).astype(float)
@@ -351,7 +354,7 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
             "date": future["date"].to_numpy(), "node_key": node_key, "issued_from": origin,
             "target": TARGETS[node_key][1], "model": row["model"],
             "visitors_est": to_visitors(pred), "visitors_low": to_visitors(low), "visitors_high": to_visitors(high),
-            "calibration_factor": factor,
+            "calibration_factor": float(factor) if factor else np.nan,
             # True when the node uses week-ahead bookings but they weren't there for this day
             "week_ahead_missing": (future[list(KNOWN_AHEAD[node_key])].isna().any(axis=1).to_numpy()
                                    if node_key in KNOWN_AHEAD else False),
@@ -360,7 +363,12 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
             "baseline_wape": round(baseline.loc[node_key, "wape"], 4),
             "range_coverage": round(row["coverage_holdout"], 3),
         }))
-    fc = pd.concat(out, ignore_index=True)
+    # Nodes without a visitor factor (Fukui Station) have all-empty visitor columns;
+    # leave them out of the concat's dtype decision, then restore them.
+    visitor_cols = ["visitors_est", "visitors_low", "visitors_high", "calibration_factor"]
+    fc = pd.concat([o.drop(columns=visitor_cols) for o in out], ignore_index=True)
+    fc = fc.join(pd.concat([o[visitor_cols].astype(float) for o in out], ignore_index=True))
+    fc = fc[list(out[0].columns)]
     warnings = []
     for node_key, cols in KNOWN_AHEAD.items():
         seen = feats.loc[(feats["node_key"] == node_key) & feats["y"].notna(), list(cols)]
