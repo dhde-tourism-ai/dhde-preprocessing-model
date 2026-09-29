@@ -73,3 +73,10 @@ sources:
   google_reviews:
     enabled: true  # Apify Google Maps Reviews Scraper, needs APIFY_TOKEN; see sources/google_reviews.py
     place_id: "ChIJY1v1P_DdAWARwMvznJtMeMo"  # Google Maps: Rainbow Line
+
+  rakuten:
+    enabled: true  # Rakuten Travel availability, snapshotted daily (collect-rakuten.yml); see sources/rakuten.py
+    search_radius_km: 3
+    # the summit is remote: few Rakuten hotels are within 3km (Rakuten's maximum)
+    lead_days: [1, 7, 30]
+    adult_num: 2

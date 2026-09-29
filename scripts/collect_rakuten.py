@@ -46,7 +46,9 @@ def main() -> int:
         nodes += 1
         _, report = load_rakuten(cfg)
         print_report(report)
-        failures += report.status == "error" or any("failed this run" in n for n in report.notes)
+        # "none taken this run": no keys, so reading old snapshots isn't a successful collection.
+        failures += report.status == "error" or any("failed this run" in n or "none taken this run" in n
+                                                    for n in report.notes)
 
     print(f"\ndone, {failures} of {nodes} node(s) with errors")
     # Fail the job only when every node failed (bad keys, blocked IP, API

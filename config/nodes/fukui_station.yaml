@@ -64,3 +64,9 @@ sources:
   google_reviews:
     enabled: true  # Apify Google Maps Reviews Scraper, needs APIFY_TOKEN; see sources/google_reviews.py
     place_id: "ChIJV5xzMu2--F8RWQ-vfzwcJFs"  # Google Maps: Fukui Station
+
+  rakuten:
+    enabled: true  # Rakuten Travel availability, snapshotted daily (collect-rakuten.yml); see sources/rakuten.py
+    search_radius_km: 3
+    lead_days: [1, 7, 30]
+    adult_num: 2
