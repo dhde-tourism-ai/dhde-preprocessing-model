@@ -42,11 +42,14 @@ HORIZON = 12
 GROWTH_MONTHS = 6          # year-on-year growth is averaged over this many recent months
 GROWTH_DAMPING = 0.5       # and only half of it is carried forward
 MIN_GROWTH_PAIRS = 3       # growth models need at least this many year-on-year pairs
-MIN_GAIN_PP = 0.5          # a candidate must beat the baseline MAPE by this much
+# A growth model must beat the baseline MAPE by this much. 1pp, not 0.5: guest-nights'
+# growth months all cross JTA's 2026-01 sampling change, so a smaller win may be the
+# method, not more guests (0.6pp for total guest-nights on the 29 Sep 2026 run).
+MIN_GAIN_PP = 1.0
 MIN_SHARED_CELLS = 24      # ...on at least this many (origin, h) cells every model scored
 MIN_BACKTEST = 12          # fewer backtest forecasts than this: baseline, no range
 MIN_RANGE_MONTHS = 12      # fewer distinct target months than this: the range is flagged rough
-THIN_MARGIN_PP = 1.0       # a growth model winning by less than this gets a note
+THIN_MARGIN_PP = 2.0       # a growth model winning by less than this gets a note
 INTERVAL = (0.10, 0.90)
 GUEST_NIGHTS_FROM = "2023-01"
 

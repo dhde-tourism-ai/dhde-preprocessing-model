@@ -98,3 +98,13 @@ def test_actuals_are_the_fitted_months(monkeypatch):
     assert list(actual["month"]) == [f"2025-{m:02d}" for m in range(1, 13)]
     assert list(actual["actual"]) == [112 + i for i in range(12)]
     assert forecast["month"].iloc[0] == "2026-01"
+
+
+def test_a_growth_model_needs_a_full_point_over_the_baseline():
+    # 24 shared cells; own_growth beats the baseline by 0.6pp: too thin, the baseline stays.
+    cells = [(str(o), h) for o in range(12) for h in (1, 2)]
+    rows = [(m, o, h, "t", 0.0, ape) for o, h in cells for m, ape in (("seasonal_naive", 10.0), ("own_growth", 9.4))]
+    bt = pd.DataFrame(rows, columns=["model", "origin", "h", "target", "log_error", "ape_pct"])
+    assert monthly.choose_model(bt)[0] == monthly.BASELINE
+    bt.loc[bt["model"] == "own_growth", "ape_pct"] = 8.9  # 1.1pp better
+    assert monthly.choose_model(bt)[0] == "own_growth"

@@ -453,11 +453,18 @@ of them. The outer square root carries half of the growth forward
 (`GROWTH_DAMPING = 0.5` on a log scale); for the neighbours, the inner one
 averages Ishikawa and Toyama.
 
-Example, Fukui guest-nights for July 2026 (run of 29 Sep 2026, data to
-June 2026): Ishikawa's growth ×1.0205, Toyama's ×1.2402, so the neighbour
-growth is √(1.0205 × 1.2402) = 1.1250 and the factor is √1.1250 = 1.0607.
-July 2025 had 353,100 guest-nights, so the forecast is
-353,100 × 1.0607 = 374,519.
+A growth model is used only if it beats `seasonal_naive` by at least 1
+percentage point of backtest error (`MIN_GAIN_PP`). On the 29 Sep 2026 run
+every series stays on `seasonal_naive`: for total guest-nights
+`neighbour_growth` was better by only 0.6pp (9.3% vs 9.9%), and all its
+growth months cross JTA's 2026-01 sampling change.
+
+Worked example of `neighbour_growth`, Fukui guest-nights for July 2026
+(data to June 2026), had it been chosen: Ishikawa's growth ×1.0205,
+Toyama's ×1.2402, so the neighbour growth is √(1.0205 × 1.2402) = 1.1250
+and the factor is √1.1250 = 1.0607. July 2025 had 353,100 guest-nights,
+so it would give 353,100 × 1.0607 = 374,519. The chosen `seasonal_naive`
+gives 353,100.
 
 The range scales the forecast by the chosen model's past errors:
 `low = Forecast × exp(q10)` and `high = Forecast × exp(q90)`, where q10 and
