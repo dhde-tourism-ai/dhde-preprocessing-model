@@ -91,7 +91,7 @@ Everything goes to `output/`, which is not committed.
 | | `integrated_kyoto*.parquet`, `integrated_osaka*.parquet` | The same for Kyoto and Osaka (`--region kyoto` or `osaka`), same columns |
 | `build_forecast.py` | `forecast_fukui.parquet` / `.csv` | Next 7 days per site: visitors and the site's own count, each with low/high, plus the backtest error |
 | `check_calibration.py` | `calibration_check.csv` | Per site: the visitor factor and how well its count tracks official monthly visitors |
-| `forecast_monthly.py` | `monthly_forecast.csv` | Next 12 months per town, the prefecture and guest-nights |
+| `forecast_monthly.py` | `monthly_forecast.csv`, `monthly_actuals.csv` | Next 12 months per town, the prefecture and guest-nights, and the actual months each forecast was fitted on |
 
 ## Sites (nodes)
 
@@ -419,7 +419,7 @@ that really exists for the prefecture, never another prefecture's.
 ## Monthly forecast
 
 ```bash
-python scripts/forecast_monthly.py   # writes output/monthly_forecast.csv + _backtest.csv
+python scripts/forecast_monthly.py   # writes output/monthly_forecast.csv + _backtest.csv + monthly_actuals.csv
 ```
 
 12 months ahead, for visitors in each Fukui node's municipality (Rainbow
@@ -436,6 +436,40 @@ that plus half of the recent year-on-year growth, either its own or
 Ishikawa's and Toyama's. `low`/`high` are the 10th–90th percentile of the
 chosen model's backtest errors. Details and thresholds are in
 `src/dhde_preprocessing/monthly_forecast.py`.
+
+The three models, for a month *m* forecast from the latest actual month:
+
+```text
+seasonal_naive:    Forecast(m) = Actual(m − 12 months)
+own_growth:        Forecast(m) = Actual(m − 12 months) × √(own growth)
+neighbour_growth:  Forecast(m) = Actual(m − 12 months) × √(neighbour growth)
+                   neighbour growth = √(Ishikawa's growth × Toyama's growth)
+                   so Forecast(m) = Actual(m − 12 months) × ⁴√(Ishikawa's growth × Toyama's growth)
+```
+
+A series' *growth* is the geometric mean of its year-on-year ratios
+(Actual(t) ÷ Actual(t − 12)) over the last 6 months, and needs at least 3
+of them. The outer square root carries half of the growth forward
+(`GROWTH_DAMPING = 0.5` on a log scale); for the neighbours, the inner one
+averages Ishikawa and Toyama.
+
+A growth model is used only if it beats `seasonal_naive` by at least 1
+percentage point of backtest error (`MIN_GAIN_PP`). On the 29 Sep 2026 run
+every series stays on `seasonal_naive`: for total guest-nights
+`neighbour_growth` was better by only 0.6pp (9.3% vs 9.9%), and all its
+growth months cross JTA's 2026-01 sampling change.
+
+Worked example of `neighbour_growth`, Fukui guest-nights for July 2026
+(data to June 2026), had it been chosen: Ishikawa's growth ×1.0205,
+Toyama's ×1.2402, so the neighbour growth is √(1.0205 × 1.2402) = 1.1250
+and the factor is √1.1250 = 1.0607. July 2025 had 353,100 guest-nights,
+so it would give 353,100 × 1.0607 = 374,519. The chosen `seasonal_naive`
+gives 353,100.
+
+The range scales the forecast by the chosen model's past errors:
+`low = Forecast × exp(q10)` and `high = Forecast × exp(q90)`, where q10 and
+q90 are the 10th and 90th percentiles of log(actual ÷ forecast) in the
+backtest. The range always includes the forecast itself.
 
 - **Fukui's visitor counts are only comparable from 2025-01.** The
   publisher's April 2026 tourism-point revision didn't reach back, so
