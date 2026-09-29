@@ -187,6 +187,10 @@ the date, stars, language and yes/no flags are kept, never names or review
 text, because the branch is public. To load an export someone ran by hand:
 `python scripts/collect_google_reviews.py --out history --import FILE.csv --max-reviews 1000`.
 Nodes opt in with a `google_reviews.place_id` in their config.
+Reviews with text are also counted per language (`reviews_lang_ja`, `_en`,
+`_zh_hant`, `_zh_hans`, `_ko`, `_other`, each with a `_stars_mean`).
+Traditional Chinese points to Taiwan or Hong Kong and Simplified to
+mainland China: a proxy for the visitor's market, not their nationality.
 
 ## Non-obvious things found while building this — read before extending
 
