@@ -177,7 +177,10 @@ def language_group(lang: pd.Series) -> pd.Series:
 
     Regional English (en-GB) counts as en; Chinese keeps its script tag.
     """
-    base = lang.where(lang.astype(str).str.startswith("zh"), lang.astype(str).str.split("-").str[0])
+    # fillna first: on pandas 3 astype(str) keeps NaN, and an all-missing
+    # column (a star-only node) then has no .str accessor.
+    text = lang.astype(object).fillna("").astype(str)
+    base = text.where(text.str.startswith("zh"), text.str.split("-").str[0])
     return base.map(LANGS).where(lang.isna() | base.isin(LANGS), "other").where(lang.notna())
 
 
