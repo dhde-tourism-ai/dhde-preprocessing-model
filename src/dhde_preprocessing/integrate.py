@@ -56,6 +56,7 @@ import jpholiday
 import pandas as pd
 
 from .config import load_node_config
+from .sources.survey import DAILY_COLS as SURVEY_COLS, ORIGIN_COLS
 
 REGIONS = {
     "fukui": ["fukui_station", "tojinbo", "katsuyama", "rainbow_line", "awara_onsen", "eiheiji"],
@@ -103,7 +104,7 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "hotel_n_reserve_reliable",
     "traffic_volume_total", "traffic_volume_upstream", "traffic_volume_downstream", "traffic_hours_observed",
     "road_congestion", "road_relative_speed_mean", "road_relative_speed_min", "road_snapshots",
-    "survey_response_count",
+    *SURVEY_COLS,
     "proxy_camera_count", "proxy_survey_count",
     "attraction_reserved_visitors", "attraction_reserved_fee", "attraction_reserved_visitors_lead7",
     "attraction_from_earlier_snapshot", "attraction_bookings_final",
@@ -118,7 +119,7 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
 ]
 
 SURVEY_COUNT = "survey_response_count"
-RESPONSE_COUNTS = [SURVEY_COUNT, "proxy_survey_count"]
+RESPONSE_COUNTS = [SURVEY_COUNT, "survey_satisfaction_n", *ORIGIN_COLS, "proxy_survey_count"]
 # Describe a row rather than measure anything, so they don't count towards has_<source>.
 NOT_A_VALUE = {"traffic_hours_observed", "rsi_level"}
 MIN_TRAFFIC_HOURS = 24
@@ -158,8 +159,9 @@ def integrate_node(master: pd.DataFrame, report: dict, node_cfg: dict,
     owner = column_sources(report)
     keep = {c: _prefixed(c, owner[c]) for c in master.columns
             if c in owner and not (owner[c] == "camera" and "face_" in c)}
-    if SURVEY_COUNT in master.columns:
-        keep[SURVEY_COUNT] = SURVEY_COUNT
+    for col in SURVEY_COLS:
+        if col in master.columns:
+            keep[col] = col
     df = master.set_index("date")[list(keep)].rename(columns=keep)
     src_of = {new: owner.get(old, "survey") for old, new in keep.items()}
 

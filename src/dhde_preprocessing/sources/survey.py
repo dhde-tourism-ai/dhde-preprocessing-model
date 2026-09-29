@@ -38,6 +38,45 @@ from .survey_toytos import load_toytos_survey
 
 CHUNK_SIZE = 50_000
 
+# 満足度 answers on the Fukui survey, as a 1-5 score.
+SATISFACTION = {"とても満足": 5, "満足": 4, "どちらでもない": 3, "不満": 2, "とても不満": 1}
+# 都道府県 (home prefecture) -> region. The Fukui survey is answered by
+# members registered in Japan: it has no overseas respondents, so origin
+# here is domestic only. Prefectures not listed are "other".
+ORIGIN_REGIONS = {
+    "fukui": ["福井県"],
+    "hokuriku": ["石川県", "富山県"],
+    "kansai": ["大阪府", "京都府", "兵庫県", "奈良県", "和歌山県", "滋賀県"],
+    "chubu": ["愛知県", "岐阜県", "三重県", "静岡県", "長野県", "山梨県", "新潟県"],
+    "kanto": ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県"],
+}
+REGION_OF = {pref: region for region, prefs in ORIGIN_REGIONS.items() for pref in prefs}
+ORIGIN_COLS = [f"survey_origin_{r}" for r in [*ORIGIN_REGIONS, "other"]]
+DAILY_COLS = ["survey_response_count", "survey_satisfaction_n", "survey_satisfaction_mean", *ORIGIN_COLS]
+
+
+def daily_summary(responses: pd.DataFrame) -> pd.DataFrame:
+    """Response-level rows -> one row per day: responses, satisfaction and home region.
+
+    survey_satisfaction_mean is over the survey_satisfaction_n responses
+    that answered 満足度 (weight by it when adding days up). A survey
+    without the 満足度 or 都道府県 column (the Ishikawa and Toyama
+    providers) gets only the response count.
+    """
+    g = responses.groupby("date")
+    out = g.size().rename("survey_response_count").to_frame()
+    if "満足度" in responses.columns:
+        score = responses["満足度"].astype(str).str.strip().map(SATISFACTION)
+        out["survey_satisfaction_n"] = score.groupby(responses["date"]).count()
+        out["survey_satisfaction_mean"] = score.groupby(responses["date"]).mean().round(3)
+    if "都道府県" in responses.columns:
+        pref = responses["都道府県"].astype(str).str.strip()
+        region = pref.map(REGION_OF).where(responses["都道府県"].isna() | pref.isin(REGION_OF), "other")
+        counts = pd.crosstab(responses["date"], region)
+        for r in [*ORIGIN_REGIONS, "other"]:
+            out[f"survey_origin_{r}"] = counts[r] if r in counts else 0
+    return out.reset_index()
+
 
 def _resolve_area_names(area_csv_path: str, area_ids: list[int]) -> dict[int, str]:
     # area.csv's "id" column is a small sequential row number — the
