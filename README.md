@@ -437,6 +437,33 @@ Ishikawa's and Toyama's. `low`/`high` are the 10th–90th percentile of the
 chosen model's backtest errors. Details and thresholds are in
 `src/dhde_preprocessing/monthly_forecast.py`.
 
+The three models, for a month *m* forecast from the latest actual month:
+
+```text
+seasonal_naive:    Forecast(m) = Actual(m − 12 months)
+own_growth:        Forecast(m) = Actual(m − 12 months) × √(own growth)
+neighbour_growth:  Forecast(m) = Actual(m − 12 months) × √(neighbour growth)
+                   neighbour growth = √(Ishikawa's growth × Toyama's growth)
+                   so Forecast(m) = Actual(m − 12 months) × ⁴√(Ishikawa's growth × Toyama's growth)
+```
+
+A series' *growth* is the geometric mean of its year-on-year ratios
+(Actual(t) ÷ Actual(t − 12)) over the last 6 months, and needs at least 3
+of them. The outer square root carries half of the growth forward
+(`GROWTH_DAMPING = 0.5` on a log scale); for the neighbours, the inner one
+averages Ishikawa and Toyama.
+
+Example, Fukui guest-nights for July 2026 (run of 29 Sep 2026, data to
+June 2026): Ishikawa's growth ×1.0205, Toyama's ×1.2402, so the neighbour
+growth is √(1.0205 × 1.2402) = 1.1250 and the factor is √1.1250 = 1.0607.
+July 2025 had 353,100 guest-nights, so the forecast is
+353,100 × 1.0607 = 374,519.
+
+The range scales the forecast by the chosen model's past errors:
+`low = Forecast × exp(q10)` and `high = Forecast × exp(q90)`, where q10 and
+q90 are the 10th and 90th percentiles of log(actual ÷ forecast) in the
+backtest. The range always includes the forecast itself.
+
 - **Fukui's visitor counts are only comparable from 2025-01.** The
   publisher's April 2026 tourism-point revision didn't reach back, so
   2024 and earlier count fewer points (Fukui 1.65x in 2025 vs 1.09x
