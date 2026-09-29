@@ -26,6 +26,10 @@ daily in GitHub Actions and commits the snapshots to the `live-data`
 branch; point DHDE_LIVE_DATA_ROOT at a checkout of it to build with them
 (unset, snapshots live under the workspace root). A lead/day already
 snapshotted today is not fetched again.
+
+Without the keys it still reads the saved snapshots (and takes none), so
+a build that only needs the history, like dhde-app's daily refresh, works
+without them. It's an error only when there are no keys and no snapshots.
 """
 from __future__ import annotations
 
@@ -44,6 +48,7 @@ SNAPSHOT_DIR = "rakuten_snapshots"
 SNAPSHOT_COLS = ["snapshot_date", "stay_date", "lead_days", "hotels_listed", "hotels_vacant", "min_charge"]
 REQUEST_GAP_S = 1.2  # Rakuten throttles repeated requests in short periods
 JST = timezone(timedelta(hours=9))  # Japan has no DST; stay dates are Japanese dates
+NO_KEYS = "RAKUTEN_APP_ID / RAKUTEN_ACCESS_KEY not set"
 
 
 class RakutenError(RuntimeError):
@@ -133,9 +138,7 @@ def load_rakuten(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
     r_cfg = node_cfg["sources"].get("rakuten", {})
     if not r_cfg.get("enabled"):
         return None, unavailable_report("rakuten", node_key, r_cfg.get("reason", "rakuten disabled for this node"))
-    if not (os.environ.get("RAKUTEN_APP_ID") and os.environ.get("RAKUTEN_ACCESS_KEY")):
-        return None, SourceReport(source="rakuten", node_key=node_key, status="error",
-                                   notes=["RAKUTEN_APP_ID / RAKUTEN_ACCESS_KEY environment variables not set"])
+    has_keys = bool(os.environ.get("RAKUTEN_APP_ID") and os.environ.get("RAKUTEN_ACCESS_KEY"))
 
     lead_days = r_cfg.get("lead_days", [1, 7, 30])
     radius = r_cfg.get("search_radius_km", 3)
@@ -151,6 +154,12 @@ def load_rakuten(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
 
     notes, new_rows = [], []
     todo = [lead for lead in lead_days if lead not in done_today]
+    if not has_keys:
+        if snaps.empty:
+            return None, SourceReport(source="rakuten", node_key=node_key, status="error",
+                                       notes=[f"{NO_KEYS} and no saved snapshots"])
+        notes.append(f"{NO_KEYS}: saved snapshots only, none taken this run")
+        todo = []
     listed = None
     if todo:
         try:

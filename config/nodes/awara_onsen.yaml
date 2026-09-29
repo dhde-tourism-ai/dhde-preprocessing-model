@@ -67,3 +67,9 @@ sources:
       Not scraped yet. Awara Onsen is a town of ryokan, not one place on
       Google Maps: pick the place (or places) that stand for it and add
       its place_id here.
+
+  rakuten:
+    enabled: true  # Rakuten Travel availability, snapshotted daily (collect-rakuten.yml); see sources/rakuten.py
+    search_radius_km: 3
+    lead_days: [1, 7, 30]
+    adult_num: 2

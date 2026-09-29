@@ -62,12 +62,29 @@ def test_failed_hotel_count_takes_no_snapshots(env, monkeypatch):
     assert any("hotel count failed" in n for n in report.notes)
 
 
-def test_missing_credentials_is_an_error_not_a_crash(monkeypatch):
+def test_missing_credentials_is_an_error_not_a_crash(monkeypatch, tmp_path):
+    monkeypatch.setattr(rakuten, "resolve_path", lambda p: str(tmp_path / p))
+    monkeypatch.delenv("DHDE_LIVE_DATA_ROOT", raising=False)
     monkeypatch.delenv("RAKUTEN_APP_ID", raising=False)
     monkeypatch.delenv("RAKUTEN_ACCESS_KEY", raising=False)
     df, report = rakuten.load_rakuten(_cfg())
     assert df is None
     assert report.status == "error"
+
+
+def test_without_keys_saved_snapshots_are_still_read(env, monkeypatch):
+    """dhde-app's refresh has no Rakuten keys but needs the saved history."""
+    monkeypatch.setattr(rakuten, "count_listed", lambda geo: 200)
+    monkeypatch.setattr(rakuten, "count_vacant", lambda *a: (100, 9000.0))
+    rakuten.load_rakuten(_cfg())  # with keys: takes today's snapshots
+
+    monkeypatch.delenv("RAKUTEN_APP_ID")
+    monkeypatch.delenv("RAKUTEN_ACCESS_KEY")
+    monkeypatch.setattr(rakuten, "count_listed", lambda geo: pytest.fail("must not call the API without keys"))
+    df, report = rakuten.load_rakuten(_cfg())
+    assert report.status == "ok"
+    assert df["rakuten_vacant_share_d1"].dropna().item() == 0.5
+    assert any("none taken this run" in n for n in report.notes)
 
 
 def test_one_failed_lead_keeps_the_other(env, monkeypatch):
