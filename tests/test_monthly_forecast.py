@@ -70,8 +70,8 @@ def test_backtest_n_counts_distinct_target_months():
 def test_failed_visitor_download_skips_visitor_series(monkeypatch):
     monkeypatch.setattr(monthly, "load_official_table", lambda: (None, ("visitors fetch failed: offline",)))
     monkeypatch.setattr(monthly, "load_guest_nights", lambda: (pd.DataFrame(), "test"))
-    forecast, scores, notes = monthly.build_monthly_forecast([monthly.SERIES[0]])
-    assert forecast.empty and scores.empty
+    forecast, scores, notes, actual = monthly.build_monthly_forecast([monthly.SERIES[0]])
+    assert forecast.empty and scores.empty and actual.empty
     assert any("every visitor series skipped" in n for n in notes)
 
 
@@ -85,3 +85,16 @@ def test_visitors_series_sums_codes_and_needs_all_of_them():
     assert list(s) == [11, 22]
     assert str(s.index[0]) == "2025-01"
     assert monthly.visitors_series(table, (18442, 11111)).empty
+
+
+def test_actuals_are_the_fitted_months(monkeypatch):
+    # Two years of a Fukui visitor series: only months from comparable_from come back as actuals.
+    months = [202401 + (i // 12) * 100 + i % 12 for i in range(24)]
+    table = pd.DataFrame({"month": months, "lgcode": 18210, "n": [100 + i for i in range(24)]})
+    monkeypatch.setattr(monthly, "load_official_table", lambda: (table, ()))
+    monkeypatch.setattr(monthly, "load_guest_nights", lambda: (pd.DataFrame(), "test"))
+    spec = monthly.SeriesSpec("tojinbo", "visitors", "Sakai city (Tojinbo)", (18210,), comparable_from="2025-01")
+    forecast, _, _, actual = monthly.build_monthly_forecast([spec])
+    assert list(actual["month"]) == [f"2025-{m:02d}" for m in range(1, 13)]
+    assert list(actual["actual"]) == [112 + i for i in range(12)]
+    assert forecast["month"].iloc[0] == "2026-01"

@@ -228,8 +228,12 @@ def guest_nights_series(table: pd.DataFrame, pref: int, column: str) -> pd.Serie
     return s
 
 
-def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
-    """(forecast rows, backtest MAPE per series and model, source notes)."""
+def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFrame, pd.DataFrame, list[str], pd.DataFrame]:
+    """(forecast rows, backtest MAPE per series and model, source notes, actual months).
+
+    The actual months are the ones each forecast was fitted on (on or after
+    `comparable_from`), so the app can draw history and forecast on one line.
+    """
     visitors, v_notes = load_official_table()  # (None, notes) if the download failed with no cache
     nights, n_note = load_guest_nights()
     notes = [*v_notes, f"guest-nights: {n_note}",
@@ -238,7 +242,7 @@ def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFr
     if visitors is None:
         notes.append("visitors: no visitor statistics this run, every visitor series skipped")
 
-    out, scores = [], []
+    out, scores, actuals = [], [], []
     for spec in series:
         if spec.kind == "visitors":
             if visitors is None:
@@ -252,6 +256,11 @@ def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFr
             notes.append(f"{spec.name}: no data for {spec.codes}, skipped")
             continue
         res = forecast_series(y, nb, spec.comparable_from)
+        hist = y[y > 0].sort_index()
+        if spec.comparable_from:
+            hist = hist[hist.index >= pd.Period(spec.comparable_from, "M")]
+        actuals.append(pd.DataFrame({"series": spec.name, "kind": spec.kind, "label": spec.label,
+                                     "month": hist.index.astype(str), "actual": hist.to_numpy().round(0)}))
         mape = res["mape"]
         margin = mape.get(BASELINE, np.nan) - mape.get(res["model"], np.nan)
         if res["model"] != BASELINE and margin < THIN_MARGIN_PP:
@@ -279,4 +288,6 @@ def build_monthly_forecast(series: list[SeriesSpec] = SERIES) -> tuple[pd.DataFr
     forecast = pd.concat(out, ignore_index=True)[cols] if out else pd.DataFrame(columns=cols)
     for c in ("predicted", "low", "high"):
         forecast[c] = pd.to_numeric(forecast[c]).round(0)  # an empty frame's columns are object dtype
-    return forecast, pd.DataFrame(scores), notes
+    actual_cols = ["series", "kind", "label", "month", "actual"]
+    actual = pd.concat(actuals, ignore_index=True)[actual_cols] if actuals else pd.DataFrame(columns=actual_cols)
+    return forecast, pd.DataFrame(scores), notes, actual

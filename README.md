@@ -91,7 +91,7 @@ Everything goes to `output/`, which is not committed.
 | | `integrated_kyoto*.parquet`, `integrated_osaka*.parquet` | The same for Kyoto and Osaka (`--region kyoto` or `osaka`), same columns |
 | `build_forecast.py` | `forecast_fukui.parquet` / `.csv` | Next 7 days per site: visitors and the site's own count, each with low/high, plus the backtest error |
 | `check_calibration.py` | `calibration_check.csv` | Per site: the visitor factor and how well its count tracks official monthly visitors |
-| `forecast_monthly.py` | `monthly_forecast.csv` | Next 12 months per town, the prefecture and guest-nights |
+| `forecast_monthly.py` | `monthly_forecast.csv`, `monthly_actuals.csv` | Next 12 months per town, the prefecture and guest-nights, and the actual months each forecast was fitted on |
 
 ## Sites (nodes)
 
@@ -419,7 +419,7 @@ that really exists for the prefecture, never another prefecture's.
 ## Monthly forecast
 
 ```bash
-python scripts/forecast_monthly.py   # writes output/monthly_forecast.csv + _backtest.csv
+python scripts/forecast_monthly.py   # writes output/monthly_forecast.csv + _backtest.csv + monthly_actuals.csv
 ```
 
 12 months ahead, for visitors in each Fukui node's municipality (Rainbow
