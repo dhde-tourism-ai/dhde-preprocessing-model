@@ -66,6 +66,26 @@ def test_daily_counts_are_zero_inside_coverage_and_missing_outside(live):
     assert pd.isna(by.loc["2026-09-25", "reviews_count_total"])
 
 
+def test_reviews_split_by_language_and_chinese_script(live):
+    _store(_items([
+        ("a", "2026-09-25T01:00:00Z", 5, "zh-Hant", "很好"),
+        ("b", "2026-09-25T02:00:00Z", 3, "zh-Hant", "普通"),
+        ("c", "2026-09-25T03:00:00Z", 2, "zh-Hans", "一般"),
+        ("d", "2026-09-25T04:00:00Z", 4, "en-GB", "Lovely"),
+        ("e", "2026-09-25T05:00:00Z", 1, "zh", "差"),        # script unknown
+        ("f", "2026-09-25T06:00:00Z", 5, "fr", "Super"),
+        ("g", "2026-09-25T07:00:00Z", 4, "ko", None),       # star only: no language
+    ]))
+    df, _ = gr.load_google_reviews(_cfg())
+    row = df.set_index("date").loc["2026-09-25"]
+    assert row["reviews_lang_zh_hant"] == 2 and row["reviews_lang_zh_hant_stars_mean"] == 4.0
+    assert row["reviews_lang_zh_hans"] == 1 and row["reviews_lang_en"] == 1
+    assert row["reviews_lang_other"] == 2 and row["reviews_lang_ko"] == 0
+    assert row["reviews_lang_ja"] == 0 and pd.isna(row["reviews_lang_ja_stars_mean"])
+    lang_counts = [c for c in df.columns if c.startswith("reviews_lang_") and not c.endswith("mean")]
+    assert row[lang_counts].sum() == row["reviews_with_text"]
+
+
 def test_star_only_reviews_are_not_counted_as_foreign(live):
     _store(_items([("a", "2026-09-25T01:00:00Z", 5, "en", None)]))
     df, _ = gr.load_google_reviews(_cfg())

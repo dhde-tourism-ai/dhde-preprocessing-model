@@ -112,6 +112,8 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "rakuten_vacant_share_d30", "rakuten_min_charge_d30",
     "reviews_new", "reviews_stars_mean", "reviews_stars_1", "reviews_stars_2", "reviews_stars_3",
     "reviews_stars_4", "reviews_stars_5", "reviews_with_text", "reviews_foreign",
+    *[f"reviews_lang_{g}{s}" for g in ("ja", "en", "zh_hant", "zh_hans", "ko", "other")
+      for s in ("", "_stars_mean")],
     "reviews_rating_total", "reviews_count_total",
 ]
 

@@ -49,6 +49,12 @@ RUN_COLS = ["run_date", "place_id", "fetched", "capped", "covered_from", "covere
             "rating_total", "count_total"]
 JST = timezone(timedelta(hours=9))
 STARS = [1, 2, 3, 4, 5]
+# Review languages counted on their own, the rest go to "other". Google
+# tags Chinese by script: Traditional (zh-Hant) points to Taiwan or Hong
+# Kong, Simplified (zh-Hans) to mainland China. That's a proxy for the
+# visitor's market, not their nationality, so columns are named by
+# language and the app says so. Plain "zh" (script unknown) is "other".
+LANGS = {"ja": "ja", "en": "en", "zh-Hant": "zh_hant", "zh-Hans": "zh_hans", "ko": "ko"}
 
 
 def review_log_path(node_key: str) -> str:
@@ -166,6 +172,15 @@ def since_date(node_key: str, overlap_days: int = 3) -> str | None:
     return (pd.Timestamp(runs["covered_to"].max()) - timedelta(days=overlap_days)).date().isoformat()
 
 
+def language_group(lang: pd.Series) -> pd.Series:
+    """Google language code -> a LANGS column suffix, "other", or missing (no text).
+
+    Regional English (en-GB) counts as en; Chinese keeps its script tag.
+    """
+    base = lang.where(lang.astype(str).str.startswith("zh"), lang.astype(str).str.split("-").str[0])
+    return base.map(LANGS).where(lang.isna() | base.isin(LANGS), "other").where(lang.notna())
+
+
 def covered_days(runs: pd.DataFrame) -> pd.DatetimeIndex:
     days = [pd.date_range(r.covered_from, r.covered_to) for r in runs.itertuples()
             if pd.notna(r.covered_from) and pd.notna(r.covered_to) and r.covered_from <= r.covered_to]
@@ -179,6 +194,11 @@ def to_daily(reviews: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
     missing then (no reviews isn't a rating). reviews_foreign counts
     reviews whose text isn't Japanese; star-only reviews have no language,
     so compare it with reviews_with_text, not reviews_new.
+
+    reviews_lang_{ja,en,zh_hant,zh_hans,ko,other} split reviews_with_text
+    by language, each with its star mean (reviews_lang_*_stars_mean,
+    missing on a day without reviews in that language). Weight the mean
+    by the count when adding days up into weeks.
     """
     days = covered_days(runs)
     r = reviews.copy()
@@ -188,15 +208,22 @@ def to_daily(reviews: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
     r = r[r["date"].isin(days)]
     has_text = r["has_text"].astype(str).str.lower() == "true"
     lang = r["language"].where(has_text)
+    group = language_group(lang)
     g = r.assign(with_text=has_text, foreign=lang.notna() & (lang != "ja")).groupby("date")
+    by_lang = {}
+    for suffix in [*LANGS.values(), "other"]:
+        stars = r["stars"].where(group == suffix).groupby(r["date"])
+        by_lang[f"reviews_lang_{suffix}"] = stars.count()
+        by_lang[f"reviews_lang_{suffix}_stars_mean"] = stars.mean().round(3)
     daily = pd.DataFrame({
         "reviews_new": g.size(),
         "reviews_stars_mean": g["stars"].mean().round(3),
         **{f"reviews_stars_{s}": g["stars"].apply(lambda x, s=s: int((x == s).sum())) for s in STARS},
         "reviews_with_text": g["with_text"].sum(),
         "reviews_foreign": g["foreign"].sum(),
+        **by_lang,
     }).reindex(days)
-    counts = [c for c in daily.columns if c != "reviews_stars_mean"]
+    counts = [c for c in daily.columns if not c.endswith("stars_mean")]
     daily[counts] = daily[counts].fillna(0).astype(int)
 
     # The place's own totals, on the day before each run (the last day it covers).
