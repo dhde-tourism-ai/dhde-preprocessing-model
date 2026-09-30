@@ -460,10 +460,20 @@ days: `survey_response_count`, `survey_satisfaction_n` and `_mean`
 (1 to 5; weight the mean by `_n`), `survey_nps_n`, `_promoters` (9-10)
 and `_detractors` (0-6), so NPS = (promoters - detractors) / n * 100
 over any window, and counts by home region (`survey_origin_*`) and
-purpose of visit (`survey_purpose_*`). These are mapped for the Fukui
-survey only; the Ishikawa and Toyama nodes give the count only for now.
-Toyama's TOYTOS survey asks similar questions under other names
-(満足度（旅行全体）, おすすめ度, 居住都道府県, 訪問目的), not mapped yet. The full
+purpose of visit (`survey_purpose_*`). A column is filled when the
+survey has a question under the same name:
+- Fukui (fukui-kanko-survey): all of them.
+- Ishikawa (Milli): the count, NPS and home region. Its overall
+  satisfaction (旅全体の総合満足度を教えてください。) and purpose (宿泊目的) have other
+  names and aren't mapped yet. For an Ishikawa node,
+  `survey_origin_hokuriku` includes 石川県, so it means local visitors,
+  and `survey_origin_fukui` means a neighbour.
+- Toyama (TOYTOS): the count only. It asks similar questions under other
+  names (満足度（旅行全体）, おすすめ度, 居住都道府県, 訪問目的), not mapped yet.
+
+As with the counts, NPS and home-region shares aren't comparable across
+the surveys: each prefecture asks different people in different places.
+Compare them within one survey. The full
 response-level table is also written separately
 (`{node}_survey_responses.parquet`) for everything else (spending, free
 text, demographics).

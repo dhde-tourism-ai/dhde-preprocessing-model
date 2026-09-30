@@ -40,9 +40,10 @@ CHUNK_SIZE = 50_000
 
 # 満足度 answers on the Fukui survey, as a 1-5 score.
 SATISFACTION = {"とても満足": 5, "満足": 4, "どちらでもない": 3, "不満": 2, "とても不満": 1}
-# 都道府県 (home prefecture) -> region. The Fukui survey is answered by
-# members registered in Japan: it has no overseas respondents, so origin
-# here is domestic only. Prefectures not listed are "other".
+# 都道府県 (home prefecture) -> region. The Fukui and Ishikawa (Milli)
+# surveys only record the 47 prefectures, so origin is domestic only.
+# Prefectures not listed are "other". "hokuriku" includes 石川県, so at an
+# Ishikawa node it means local visitors, and "fukui" means a neighbour.
 ORIGIN_REGIONS = {
     "fukui": ["福井県"],
     "hokuriku": ["石川県", "富山県"],
@@ -88,9 +89,11 @@ def daily_summary(responses: pd.DataFrame) -> pd.DataFrame:
     survey_satisfaction_mean is over the survey_satisfaction_n responses
     that answered 満足度 (weight by it when adding days up). NPS:
     promoters answered 9-10, detractors 0-6, out of survey_nps_n answers.
-    A survey without the 満足度, NPS or 都道府県 column (the Ishikawa and
-    Toyama providers) gets only the response count. Toyama's TOYTOS asks
-    similar questions under other column names, not mapped yet.
+    Each column needs the survey's question under the same name: Fukui
+    has them all; Ishikawa's Milli has NPS and 都道府県 (so it gets the NPS
+    and home-region counts, not satisfaction or purpose); Toyama's TOYTOS
+    gets only the response count. Milli and TOYTOS ask the missing
+    questions under other column names, not mapped yet.
     """
     g = responses.groupby("date")
     out = g.size().rename("survey_response_count").to_frame()
