@@ -460,8 +460,10 @@ days: `survey_response_count`, `survey_satisfaction_n` and `_mean`
 (1 to 5; weight the mean by `_n`), `survey_nps_n`, `_promoters` (9-10)
 and `_detractors` (0-6), so NPS = (promoters - detractors) / n * 100
 over any window, and counts by home region (`survey_origin_*`) and
-purpose of visit (`survey_purpose_*`). Only the Fukui survey has these
-questions; the Ishikawa and Toyama surveys give the count only. The full
+purpose of visit (`survey_purpose_*`). These are mapped for the Fukui
+survey only; the Ishikawa and Toyama nodes give the count only for now.
+Toyama's TOYTOS survey asks similar questions under other names
+(満足度（旅行全体）, おすすめ度, 居住都道府県, 訪問目的), not mapped yet. The full
 response-level table is also written separately
 (`{node}_survey_responses.parquet`) for everything else (spending, free
 text, demographics).

@@ -89,7 +89,8 @@ def daily_summary(responses: pd.DataFrame) -> pd.DataFrame:
     that answered 満足度 (weight by it when adding days up). NPS:
     promoters answered 9-10, detractors 0-6, out of survey_nps_n answers.
     A survey without the 満足度, NPS or 都道府県 column (the Ishikawa and
-    Toyama providers) gets only the response count.
+    Toyama providers) gets only the response count. Toyama's TOYTOS asks
+    similar questions under other column names, not mapped yet.
     """
     g = responses.groupby("date")
     out = g.size().rename("survey_response_count").to_frame()
