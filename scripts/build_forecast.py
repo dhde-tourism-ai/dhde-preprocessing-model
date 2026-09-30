@@ -4,7 +4,8 @@ Backtest the forecast models and forecast the next 7 days per node.
 
 Run scripts/build_integrated.py first; this reads its training table.
 Writes output/forecast_fukui.parquet (plus .csv), forecast_fukui_backtest.csv
-(scores per node and model) and forecast_fukui_report.json.
+(scores per node and model) and forecast_fukui_report.json, and records the
+run in output/model_registry.csv with its fitted models (see model_registry.py).
 
 Usage:
     python scripts/build_forecast.py
@@ -23,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import pandas as pd
 
+from dhde_preprocessing import model_registry
 from dhde_preprocessing.forecast import BACKTEST_WEEKS, PENDING, forecast, write_forecast
 
 
@@ -37,7 +39,7 @@ def main() -> None:
 
     table = pd.read_parquet(args.input)
     full = pd.read_parquet(args.full) if Path(args.full).exists() else None
-    fc, scores, report = forecast(table, weeks=args.weeks, full=full)
+    fc, scores, report, models = forecast(table, weeks=args.weeks, full=full)
 
     print(f"\nBacktest, last {args.weeks} weeks (WAPE, lower is better):")
     wide = scores.pivot(index="node_key", columns="model", values="wape")
@@ -54,6 +56,8 @@ def main() -> None:
     for warning in report["warnings"]:
         print(f"  WARNING: {warning}")
     write_forecast(fc, scores, report, output_dir=args.output_dir)
+    version = model_registry.record(model_registry.daily_rows(fc), args.output_dir, models=models)
+    print(f"[OK] recorded run {version} in {Path(args.output_dir) / model_registry.REGISTRY}")
 
 
 if __name__ == "__main__":

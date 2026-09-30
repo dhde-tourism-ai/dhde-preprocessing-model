@@ -7,6 +7,7 @@ Downloads its two sources itself (no build_node.py run needed) and writes:
     output/monthly_forecast.csv           one row per series per future month
     output/monthly_forecast_backtest.csv  backtest MAPE per series and model
     output/monthly_actuals.csv            the actual months each forecast was fitted on
+and records the run in output/model_registry.csv (see model_registry.py).
 
 Usage:
     python scripts/forecast_monthly.py
@@ -23,6 +24,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from dhde_preprocessing import model_registry
 from dhde_preprocessing.monthly_forecast import build_monthly_forecast
 
 
@@ -43,6 +45,9 @@ def main() -> None:
     scores.to_csv(out / "monthly_forecast_backtest.csv", index=False)
     actual.to_csv(out / "monthly_actuals.csv", index=False)
     print(f"\nwrote {len(forecast)} rows to {out / 'monthly_forecast.csv'}")
+    if not forecast.empty:
+        version = model_registry.record(model_registry.monthly_rows(forecast), args.output_dir)
+        print(f"recorded run {version} in {out / model_registry.REGISTRY}")
 
 
 if __name__ == "__main__":

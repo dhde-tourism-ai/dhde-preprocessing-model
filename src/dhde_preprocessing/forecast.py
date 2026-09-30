@@ -225,25 +225,29 @@ def _fit_ridge(tr: pd.DataFrame, ahead: list[str]) -> Ridge | None:
     return Ridge(alpha=1.0).fit(x[ok], np.log1p(tr.loc[ok, "y"])) if ok.sum() >= 30 else None
 
 
-def fit_predict_regression(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
+def fit_regression(train: pd.DataFrame) -> dict[str, list[tuple[list[str], Ridge]]]:
     """One ridge regression per node, on log1p(target).
 
     Nodes with week-ahead features get two fits: with them, and without
-    them. A test day with its week-ahead value uses the first; a day
-    without one (a late feed) uses the second instead of failing or
-    returning NaN.
+    them (node -> [(columns, model), ...], full model first). A day
+    without its week-ahead value (a late feed) uses the second instead of
+    failing or returning NaN.
     """
-    pred = pd.Series(np.nan, index=test.index)
+    fitted = {}
     for node_key, tr in train.groupby("node_key"):
-        te = test[test["node_key"] == node_key]
-        if te.empty:
-            continue
         ahead = list(KNOWN_AHEAD.get(node_key, {}))
-        for cols in ([ahead] if ahead else []) + [[]]:  # full model first, then the fallback
+        fits = [(cols, _fit_ridge(tr, cols)) for cols in ([ahead] if ahead else []) + [[]]]
+        fitted[node_key] = [(cols, m) for cols, m in fits if m is not None]
+    return fitted
+
+
+def predict_regression(fitted: dict, test: pd.DataFrame) -> np.ndarray:
+    pred = pd.Series(np.nan, index=test.index)
+    for node_key, te in test.groupby("node_key"):
+        for cols, model in fitted.get(node_key, []):
             todo = te.index[pred[te.index].isna()]
-            model = _fit_ridge(tr, cols)
-            if model is None or todo.empty:
-                continue
+            if todo.empty:
+                break
             x = _regression_matrix(te.loc[todo], cols)
             usable = x.notna().all(axis=1)
             if usable.any():
@@ -251,30 +255,42 @@ def fit_predict_regression(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarra
     return pred.to_numpy()
 
 
-def fit_predict_lightgbm(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
+def fit_predict_regression(train: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
+    return predict_regression(fit_regression(train[train["node_key"].isin(set(test["node_key"]))]), test)
+
+
+def _lgb_x(df: pd.DataFrame) -> pd.DataFrame:
+    out = df[FEATURES].copy()
+    out["node"] = df["node_key"].astype(pd.CategoricalDtype(sorted(TARGETS)))
+    return out
+
+
+def fit_lightgbm(train: pd.DataFrame) -> lgb.LGBMRegressor:
     """One model pooled across nodes, on log1p(target)."""
-    cats = pd.CategoricalDtype(sorted(TARGETS))
-
-    def x(df):
-        out = df[FEATURES].copy()
-        out["node"] = df["node_key"].astype(cats)
-        return out
-
     model = lgb.LGBMRegressor(n_estimators=400, learning_rate=0.03, num_leaves=15,
                               min_child_samples=20, subsample=0.8, subsample_freq=1,
                               colsample_bytree=0.8, random_state=0, verbose=-1)
-    model.fit(x(train), np.log1p(train["y"]))
-    return np.expm1(model.predict(x(test)))
+    return model.fit(_lgb_x(train), np.log1p(train["y"]))
+
+
+def predict_lightgbm(model: lgb.LGBMRegressor, test: pd.DataFrame) -> np.ndarray:
+    return np.expm1(model.predict(_lgb_x(test)))
 
 
 def predict_baseline(test: pd.DataFrame) -> np.ndarray:
     return np.expm1(test["lag7"]).to_numpy()
 
 
+# name -> (fit(train) -> fitted, predict(fitted, test) -> values). The baseline has nothing to fit.
+FIT_PREDICT = {
+    "baseline": (lambda train: None, lambda fitted, test: predict_baseline(test)),
+    "regression": (fit_regression, predict_regression),
+    "lightgbm": (fit_lightgbm, predict_lightgbm),
+}
 MODELS = {
     "baseline": lambda train, test: predict_baseline(test),
     "regression": fit_predict_regression,
-    "lightgbm": fit_predict_lightgbm,
+    "lightgbm": lambda train, test: predict_lightgbm(fit_lightgbm(train), test),
 }
 
 
@@ -387,12 +403,13 @@ def calibration(y: pd.Series, node_cfg: dict) -> dict:
 
 
 def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
-             full: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Returns (forecast rows, backtest scores, report).
+             full: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
+    """Returns (forecast rows, backtest scores, report, fitted models).
 
     Each node gets the model with the lowest backtest WAPE; its forecast
     for the 7 days after the last observed day, with a low/high range
-    from that model's backtest errors at that node.
+    from that model's backtest errors at that node. Fitted models are
+    node -> (model name, what it was fitted to), for model_registry.
     """
     feats = feature_table(table, extra_days=HORIZON, full=full)
     scores = score(backtest(feats, weeks=weeks))  # future rows have no y, so they're never tested
@@ -400,12 +417,15 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
     baseline = scores[scores["model"] == "baseline"].set_index("node_key")
 
     train = _trainable(feats)
+    fitted = {m: FIT_PREDICT[m][0](train) for m in best["model"].unique()}  # each chosen model fitted once
+    models = {node_key: (m, fitted[m].get(node_key, []) if m == "regression" else fitted[m])
+              for node_key, m in best["model"].items()}
     out, calib = [], {}
     for node_key, row in best.iterrows():
         nf = feats[feats["node_key"] == node_key]
         origin = nf.loc[nf["y"].notna(), "date"].max()
         future = nf[(nf["date"] > origin) & (nf["date"] <= origin + pd.Timedelta(days=HORIZON))]
-        pred = MODELS[row["model"]](train, future)
+        pred = FIT_PREDICT[row["model"]][1](fitted[row["model"]], future)
         low = np.expm1(np.log1p(pred) + row["log_err_low"]).clip(min=0)
         high = np.expm1(np.log1p(pred) + row["log_err_high"])
         calib[node_key] = calibration(nf.set_index("date")["y"], load_node_config(node_key))
@@ -455,7 +475,7 @@ def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
         "pending": PENDING,
         "scores": json.loads(scores.round(4).to_json(orient="records")),
     }
-    return fc, scores, report
+    return fc, scores, report, models
 
 
 def write_forecast(fc: pd.DataFrame, scores: pd.DataFrame, report: dict, output_dir: str = "output",

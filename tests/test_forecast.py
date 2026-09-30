@@ -63,7 +63,7 @@ def test_backtest_only_tests_the_seven_days_after_each_origin():
 
 def test_forecast_covers_the_next_seven_days_with_a_range():
     table = _table()
-    fc, scores, report = forecast(table, weeks=6)
+    fc, scores, report, _ = forecast(table, weeks=6)
     last = table["date"].max()
     for node_key, rows in fc.groupby("node_key"):
         assert list(rows["date"]) == list(pd.date_range(last + pd.Timedelta(days=1), periods=HORIZON))
@@ -93,7 +93,7 @@ def test_no_official_figure_or_too_few_days_means_no_visitor_conversion():
 
 
 def test_forecast_reports_visitors_next_to_the_measured_count():
-    fc, _, report = forecast(_table(), weeks=4)
+    fc, _, report, _ = forecast(_table(), weeks=4)
     row = fc[fc["node_key"] == "tojinbo"].iloc[0]
     factor = report["calibration"]["tojinbo"]["factor"]
     assert factor and np.isclose(row["visitors_est"], round(row["predicted"] * factor), atol=1)
@@ -119,7 +119,7 @@ def test_a_late_booking_feed_falls_back_instead_of_crashing():
     the whole run failed; with some missing, those days came out NaN."""
     for missing in (HORIZON, 3):
         table, full = _with_bookings(missing)
-        fc, _, report = forecast(table, weeks=4, full=full)
+        fc, _, report, _ = forecast(table, weeks=4, full=full)
         k = fc[fc["node_key"] == "katsuyama"]
         assert k["predicted"].notna().all()
         assert k["week_ahead_missing"].sum() == missing
@@ -129,7 +129,7 @@ def test_a_late_booking_feed_falls_back_instead_of_crashing():
 def test_warns_when_week_ahead_columns_are_missing_from_the_input():
     """Node tables built without the week-ahead columns (e.g. from main before
     this PR) must say so, not silently score worse."""
-    _, _, report = forecast(_table(), weeks=4)
+    _, _, report, _ = forecast(_table(), weeks=4)
     assert any("katsuyama: no week-ahead bookings in the input" in w for w in report["warnings"])
 
 
@@ -175,14 +175,14 @@ def test_bookings_so_far_are_not_used_as_final_counts():
     table.loc[last_two, "attraction_from_earlier_snapshot"] = 1
     y = node_target(table, "katsuyama")
     assert y.iloc[-2:].isna().all() and y.iloc[:-2].notna().all()
-    _, _, report = forecast(table, weeks=4)
+    _, _, report, _ = forecast(table, weeks=4)
     assert any("only had bookings so far" in w for w in report["warnings"])
 
 
 def test_a_backtest_too_short_to_check_the_range_does_not_crash():
     """Regression test (PR #13 review): np.quantile on an empty first half
     raised IndexError with --weeks 1 or a node whose data starts late."""
-    fc, scores, _ = forecast(_table(), weeks=1)
+    fc, scores, _, _ = forecast(_table(), weeks=1)
     assert scores["coverage_holdout"].isna().all()
     assert fc["predicted"].notna().all()
 

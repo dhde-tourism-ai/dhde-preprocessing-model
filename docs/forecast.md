@@ -16,6 +16,13 @@ Outputs, in `output/`:
 - `forecast_fukui_backtest.csv`: backtest scores per node and model.
 - `forecast_fukui_report.json`: the same scores, the model chosen per node,
   and the pending nodes with the reason.
+- `model_registry.csv`: one row per node per run, appended: the run's
+  `version` (UTC time + git commit), the model used, its backtest error
+  (`error_pct`, WAPE) and the baseline's. `models/<version>/models.joblib`
+  holds that run's fitted models. `python scripts/compare_models.py`
+  prints the latest run next to the previous one as a Markdown table
+  (`--forecast monthly` for the monthly forecast, which records its runs
+  there too). See `src/dhde_preprocessing/model_registry.py`.
 
 ## What is forecast
 
