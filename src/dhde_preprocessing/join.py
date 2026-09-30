@@ -26,7 +26,7 @@ from .sources.monthly_visitors import load_monthly_visitors
 from .sources.rakuten import load_rakuten
 from .sources.road_congestion import load_road_congestion
 from .sources.rsi import load_rsi
-from .sources.survey import load_survey
+from .sources.survey import daily_summary as survey_daily, load_survey
 from .sources.traffic import load_traffic
 from .sources.visitor_reservation import load_visitor_reservation
 from .sources.weather import load_weather
@@ -92,9 +92,7 @@ def build_node_table(node_key: str) -> tuple[pd.DataFrame, pd.DataFrame | None, 
     reports.append(survey_report)
     print_report(survey_report)
     if survey_df is not None:
-        daily_counts = (
-            survey_df.groupby("date").size().rename("survey_response_count").reset_index()
-        )
+        daily_counts = survey_daily(survey_df)
         master = daily_counts if master is None else pd.merge(master, daily_counts, on="date", how="outer")
 
     if master is None:

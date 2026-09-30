@@ -22,10 +22,10 @@ area, so a loose match would pull in false positives.
 This module returns the raw, response-level filtered rows (one row per
 survey response, not aggregated to one row per day) — every original
 column is preserved for whatever the later modeling stage needs
-(satisfaction, NPS, spending, free text, demographics). Aggregating this
-down to a single daily figure (a response count, at minimum) happens in
-join.py, since that's a per-node table-shape decision, not a per-source
-cleaning decision.
+(satisfaction, NPS, spending, free text, demographics). `daily_summary`
+turns it into one row per day (response count, satisfaction, NPS counts,
+home region, purpose of visit); join.py calls it when building the node
+table.
 """
 from __future__ import annotations
 
@@ -37,6 +37,86 @@ from .survey_milli import load_milli_survey
 from .survey_toytos import load_toytos_survey
 
 CHUNK_SIZE = 50_000
+
+# 満足度 answers on the Fukui survey, as a 1-5 score.
+SATISFACTION = {"とても満足": 5, "満足": 4, "どちらでもない": 3, "不満": 2, "とても不満": 1}
+# 都道府県 (home prefecture) -> region. The Fukui and Ishikawa (Milli)
+# surveys only record the 47 prefectures, so origin is domestic only.
+# Prefectures not listed are "other". "hokuriku" includes 石川県, so at an
+# Ishikawa node it means local visitors, and "fukui" means a neighbour.
+ORIGIN_REGIONS = {
+    "fukui": ["福井県"],
+    "hokuriku": ["石川県", "富山県"],
+    "kansai": ["大阪府", "京都府", "兵庫県", "奈良県", "和歌山県", "滋賀県"],
+    "chubu": ["愛知県", "岐阜県", "三重県", "静岡県", "長野県", "山梨県", "新潟県"],
+    "kanto": ["東京都", "神奈川県", "埼玉県", "千葉県", "茨城県", "栃木県", "群馬県"],
+}
+REGION_OF = {pref: region for region, prefs in ORIGIN_REGIONS.items() for pref in prefs}
+ORIGIN_COLS = [f"survey_origin_{r}" for r in [*ORIGIN_REGIONS, "other"]]
+# 訪問目的 (purpose of visit): one 0/1 column per answer, several allowed.
+# The free-text その他 (other) column is left out.
+PURPOSES = {
+    "宿でのんびり過ごす": "relax_at_inn",
+    "温泉や露天風呂": "onsen",
+    "地元の美味しいものを食べる": "local_food",
+    "花見や紅葉などの自然鑑賞": "nature",
+    "名所、旧跡の観光": "sightseeing",
+    "テーマパーク（遊園地、動物園、博物館など）": "theme_park_museum",
+    "買い物、アウトレット": "shopping",
+    "お祭りやイベントへの参加・見物": "events",
+    "スポーツ観戦や芸能鑑賞（コンサート等）": "shows",
+    "アウトドア（海水浴、釣り、登山など）": "outdoor",
+    "まちあるき、都市散策": "town_walk",
+    "各種体験（手作り、果物狩りなど）": "experiences",
+    "スキー・スノボ、マリンスポーツ": "ski_marine",
+    "その他スポーツ（ゴルフ、テニスなど）": "other_sports",
+    "ドライブ・ツーリング": "drive",
+    "友人・親戚を尋ねる": "visit_friends",
+    "出張など仕事関係": "business",
+}
+PURPOSE_COLS = [f"survey_purpose_{k}" for k in PURPOSES.values()]
+# NPS ("would you recommend", 0-10) as counts, so any window adds up:
+# NPS = (promoters - detractors) / n * 100.
+NPS_COLS = ["survey_nps_n", "survey_nps_promoters", "survey_nps_detractors"]
+DAILY_COLS = ["survey_response_count", "survey_satisfaction_n", "survey_satisfaction_mean", *NPS_COLS,
+              *ORIGIN_COLS, *PURPOSE_COLS]
+
+
+def daily_summary(responses: pd.DataFrame) -> pd.DataFrame:
+    """Response-level rows -> one row per day: responses, satisfaction, NPS
+    counts, home region and purpose of visit.
+
+    survey_satisfaction_mean is over the survey_satisfaction_n responses
+    that answered 満足度 (weight by it when adding days up). NPS:
+    promoters answered 9-10, detractors 0-6, out of survey_nps_n answers.
+    Each column needs the survey's question under the same name: Fukui
+    has them all; Ishikawa's Milli has NPS and 都道府県 (so it gets the NPS
+    and home-region counts, not satisfaction or purpose); Toyama's TOYTOS
+    gets only the response count. Milli and TOYTOS ask the missing
+    questions under other column names, not mapped yet.
+    """
+    g = responses.groupby("date")
+    out = g.size().rename("survey_response_count").to_frame()
+    if "満足度" in responses.columns:
+        score = responses["満足度"].astype(str).str.strip().map(SATISFACTION)
+        out["survey_satisfaction_n"] = score.groupby(responses["date"]).count()
+        out["survey_satisfaction_mean"] = score.groupby(responses["date"]).mean().round(3)
+    if "NPS" in responses.columns:
+        nps = pd.to_numeric(responses["NPS"], errors="coerce").where(lambda v: v.between(0, 10))
+        out["survey_nps_n"] = nps.groupby(responses["date"]).count()
+        out["survey_nps_promoters"] = nps.ge(9).groupby(responses["date"]).sum()
+        out["survey_nps_detractors"] = nps.le(6).groupby(responses["date"]).sum()
+    if "都道府県" in responses.columns:
+        pref = responses["都道府県"].astype(str).str.strip()
+        region = pref.map(REGION_OF).where(responses["都道府県"].isna() | pref.isin(REGION_OF), "other")
+        counts = pd.crosstab(responses["date"], region)
+        for r in [*ORIGIN_REGIONS, "other"]:
+            out[f"survey_origin_{r}"] = counts[r] if r in counts else 0
+    for col, key in PURPOSES.items():
+        if col in responses.columns:
+            ticked = pd.to_numeric(responses[col], errors="coerce").fillna(0).eq(1)
+            out[f"survey_purpose_{key}"] = ticked.groupby(responses["date"]).sum()
+    return out.reset_index()
 
 
 def _resolve_area_names(area_csv_path: str, area_ids: list[int]) -> dict[int, str]:

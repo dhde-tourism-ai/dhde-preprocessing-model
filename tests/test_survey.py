@@ -69,6 +69,36 @@ def test_unknown_area_id_is_reported_as_error(patch_resolve_path):
     assert report.status == "error"
 
 
+def test_daily_summary_scores_satisfaction_and_groups_home_prefecture():
+    responses = pd.DataFrame({
+        "date": pd.to_datetime(["2024-01-01"] * 4 + ["2024-01-02"]),
+        "満足度": ["とても満足", "満足", "不満", None, "どちらでもない"],
+        "都道府県": ["福井県", "大阪府", "北海道", "石川県", None],
+        "NPS": [10, 9, 3, None, 7],
+        "温泉や露天風呂": [1, 1, 0, 0, 1],
+        "地元の美味しいものを食べる": [1, 0, 0, None, 0],
+    })
+    by = survey.daily_summary(responses).set_index("date")
+    day = by.loc["2024-01-01"]
+    assert day["survey_response_count"] == 4
+    assert day["survey_satisfaction_n"] == 3 and day["survey_satisfaction_mean"] == pytest.approx(11 / 3, abs=1e-3)
+    assert (day["survey_origin_fukui"], day["survey_origin_kansai"], day["survey_origin_hokuriku"],
+            day["survey_origin_other"], day["survey_origin_kanto"]) == (1, 1, 1, 1, 0)
+    assert (day["survey_nps_n"], day["survey_nps_promoters"], day["survey_nps_detractors"]) == (3, 2, 1)
+    assert by.loc["2024-01-02", ["survey_nps_promoters", "survey_nps_detractors"]].sum() == 0  # 7 is passive
+    assert day["survey_purpose_onsen"] == 2 and day["survey_purpose_local_food"] == 1
+    assert "survey_purpose_shopping" not in by.columns  # not asked in this sample
+    # No prefecture given: counted as a response, not as any region.
+    assert by.loc["2024-01-02", survey.ORIGIN_COLS].sum() == 0
+
+
+def test_daily_summary_without_the_fukui_columns_counts_only():
+    responses = pd.DataFrame({"date": pd.to_datetime(["2024-01-01", "2024-01-01"])})
+    out = survey.daily_summary(responses)
+    assert list(out.columns) == ["date", "survey_response_count"]
+    assert out["survey_response_count"].item() == 2
+
+
 def test_disabled_survey_returns_unavailable():
     node_cfg = {"node_key": "x", "sources": {"survey": {"enabled": False, "reason": "nope"}}}
     df, report = survey.load_survey(node_cfg)
