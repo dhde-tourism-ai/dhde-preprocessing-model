@@ -72,7 +72,7 @@ until it's added to `EXPECTED_COLUMNS`.
 | (none) | Monthly visitors, JTA statistics | `city_visitors_month`, `pref_visitors_month`: the month's total, repeated on every day of it | Kyoto, Osaka (Fukui configs don't opt in yet) |
 | `rakuten_` | Rakuten Travel availability | `rakuten_vacant_share_d1` / `_d7` / `_d30` (share of hotels with a room left 1, 7, 30 days before), `rakuten_min_charge_*` | Kyoto, Osaka; history only from the first daily run |
 | `road_` | TomTom road congestion | `road_congestion` (1 - mean relative speed), `road_relative_speed_mean`, `road_relative_speed_min`, `road_snapshots` | All six, once the collector has history (empty today) |
-| `survey_` | Visitor survey responses | `survey_response_count` | All |
+| `survey_` | Visitor survey responses | `survey_response_count`; Fukui survey only: `survey_satisfaction_n`, `survey_satisfaction_mean` (1-5, weight by `_n`), `survey_nps_n`, `survey_nps_promoters` (9-10), `survey_nps_detractors` (0-6), so NPS = (promoters - detractors) / n * 100 over any window; `survey_origin_*` (home region counts, domestic only), `survey_purpose_*` (purpose of visit counts, several per response) | All (count); the six Fukui nodes (the rest) |
 | `proxy_` | Stand-ins for nodes without a camera | `proxy_camera_count` (Tojinbo's camera, for Awara Onsen), `proxy_survey_count` | Awara Onsen, Eiheiji, Katsuyama |
 | `attraction_` | Dinosaur Museum advance bookings | `attraction_reserved_visitors` (~57% of all visitors), `attraction_reserved_visitors_lead7` (booked as of 7 days before; 0 on closing days) | Katsuyama |
 
@@ -80,7 +80,8 @@ until it's added to `EXPECTED_COLUMNS`.
 
 - Camera Face.csv demographic columns: a small, biased sample of each
   count (see `camera.py`); still in each `{node}_master.parquet`.
-- Response-level survey answers (satisfaction, spending, free text): in
+- Response-level survey answers (spending, free text, demographics, and
+  each single answer behind the daily survey columns): in
   `{node}_survey_responses.parquet`.
 - Values for `road_*` (TomTom): the columns are there but empty until the
   hourly collector has run with `TOMTOM_API_KEY` set; they fill in

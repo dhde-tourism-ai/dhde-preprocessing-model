@@ -453,15 +453,18 @@ chosen model's backtest errors. Details and thresholds are in
 ## Why survey is handled differently from the other sources
 
 The other sources are naturally one-row-per-day. Survey responses
-are one-row-per-response — many per day. Aggregating that down to a
-score or summary is a modeling-stage decision (which fields to average,
-how to weight them), out of scope here. So `sources/survey.py` returns
-the raw, filtered, response-level table, and `join.py` derives exactly
-one mechanical column from it for the master table —
-`survey_response_count` (just a count, not a score) — while also writing
-the full response-level table separately (`{node}_survey_responses.parquet`)
-so the modeling stage has every original column (satisfaction, NPS,
-spending, free text, demographics) to work with directly.
+are one-row-per-response, many per day. So `sources/survey.py` returns
+the raw, filtered, response-level table, and `survey.daily_summary`
+(called by `join.py`) turns it into daily columns that add up across
+days: `survey_response_count`, `survey_satisfaction_n` and `_mean`
+(1 to 5; weight the mean by `_n`), `survey_nps_n`, `_promoters` (9-10)
+and `_detractors` (0-6), so NPS = (promoters - detractors) / n * 100
+over any window, and counts by home region (`survey_origin_*`) and
+purpose of visit (`survey_purpose_*`). Only the Fukui survey has these
+questions; the Ishikawa and Toyama surveys give the count only. The full
+response-level table is also written separately
+(`{node}_survey_responses.parquet`) for everything else (spending, free
+text, demographics).
 
 ## Tests
 

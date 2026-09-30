@@ -22,10 +22,10 @@ area, so a loose match would pull in false positives.
 This module returns the raw, response-level filtered rows (one row per
 survey response, not aggregated to one row per day) — every original
 column is preserved for whatever the later modeling stage needs
-(satisfaction, NPS, spending, free text, demographics). Aggregating this
-down to a single daily figure (a response count, at minimum) happens in
-join.py, since that's a per-node table-shape decision, not a per-source
-cleaning decision.
+(satisfaction, NPS, spending, free text, demographics). `daily_summary`
+turns it into one row per day (response count, satisfaction, NPS counts,
+home region, purpose of visit); join.py calls it when building the node
+table.
 """
 from __future__ import annotations
 
@@ -74,17 +74,22 @@ PURPOSES = {
     "出張など仕事関係": "business",
 }
 PURPOSE_COLS = [f"survey_purpose_{k}" for k in PURPOSES.values()]
-DAILY_COLS = ["survey_response_count", "survey_satisfaction_n", "survey_satisfaction_mean", *ORIGIN_COLS,
-              *PURPOSE_COLS]
+# NPS ("would you recommend", 0-10) as counts, so any window adds up:
+# NPS = (promoters - detractors) / n * 100.
+NPS_COLS = ["survey_nps_n", "survey_nps_promoters", "survey_nps_detractors"]
+DAILY_COLS = ["survey_response_count", "survey_satisfaction_n", "survey_satisfaction_mean", *NPS_COLS,
+              *ORIGIN_COLS, *PURPOSE_COLS]
 
 
 def daily_summary(responses: pd.DataFrame) -> pd.DataFrame:
-    """Response-level rows -> one row per day: responses, satisfaction and home region.
+    """Response-level rows -> one row per day: responses, satisfaction, NPS
+    counts, home region and purpose of visit.
 
     survey_satisfaction_mean is over the survey_satisfaction_n responses
-    that answered 満足度 (weight by it when adding days up). A survey
-    without the 満足度 or 都道府県 column (the Ishikawa and Toyama
-    providers) gets only the response count.
+    that answered 満足度 (weight by it when adding days up). NPS:
+    promoters answered 9-10, detractors 0-6, out of survey_nps_n answers.
+    A survey without the 満足度, NPS or 都道府県 column (the Ishikawa and
+    Toyama providers) gets only the response count.
     """
     g = responses.groupby("date")
     out = g.size().rename("survey_response_count").to_frame()
@@ -92,6 +97,11 @@ def daily_summary(responses: pd.DataFrame) -> pd.DataFrame:
         score = responses["満足度"].astype(str).str.strip().map(SATISFACTION)
         out["survey_satisfaction_n"] = score.groupby(responses["date"]).count()
         out["survey_satisfaction_mean"] = score.groupby(responses["date"]).mean().round(3)
+    if "NPS" in responses.columns:
+        nps = pd.to_numeric(responses["NPS"], errors="coerce").where(lambda v: v.between(0, 10))
+        out["survey_nps_n"] = nps.groupby(responses["date"]).count()
+        out["survey_nps_promoters"] = nps.ge(9).groupby(responses["date"]).sum()
+        out["survey_nps_detractors"] = nps.le(6).groupby(responses["date"]).sum()
     if "都道府県" in responses.columns:
         pref = responses["都道府県"].astype(str).str.strip()
         region = pref.map(REGION_OF).where(responses["都道府県"].isna() | pref.isin(REGION_OF), "other")

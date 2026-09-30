@@ -56,7 +56,7 @@ import jpholiday
 import pandas as pd
 
 from .config import load_node_config
-from .sources.survey import DAILY_COLS as SURVEY_COLS, ORIGIN_COLS, PURPOSE_COLS
+from .sources.survey import DAILY_COLS as SURVEY_COLS, NPS_COLS, ORIGIN_COLS, PURPOSE_COLS
 
 REGIONS = {
     "fukui": ["fukui_station", "tojinbo", "katsuyama", "rainbow_line", "awara_onsen", "eiheiji"],
@@ -119,7 +119,8 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
 ]
 
 SURVEY_COUNT = "survey_response_count"
-RESPONSE_COUNTS = [SURVEY_COUNT, "survey_satisfaction_n", *ORIGIN_COLS, *PURPOSE_COLS, "proxy_survey_count"]
+RESPONSE_COUNTS = [SURVEY_COUNT, "survey_satisfaction_n", *NPS_COLS, *ORIGIN_COLS, *PURPOSE_COLS,
+                   "proxy_survey_count"]
 # Describe a row rather than measure anything, so they don't count towards has_<source>.
 NOT_A_VALUE = {"traffic_hours_observed", "rsi_level"}
 MIN_TRAFFIC_HOURS = 24
