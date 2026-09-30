@@ -68,3 +68,10 @@ sources:
   google_reviews:
     enabled: true  # Apify Google Maps Reviews Scraper, needs APIFY_TOKEN; see sources/google_reviews.py
     place_id: "ChIJzYo4YsSX-F8R6Sl4_CeuUyw"  # Google Maps: Daihonzan Eiheiji
+
+  rakuten:
+    enabled: true  # Rakuten Travel availability, snapshotted daily (collect-rakuten.yml); see sources/rakuten.py
+    search_radius_km: 3
+    # hotels within 3km of the temple; its `hotel` feed is the regional Echizen coast one, not a local one
+    lead_days: [1, 7, 30]
+    adult_num: 2
