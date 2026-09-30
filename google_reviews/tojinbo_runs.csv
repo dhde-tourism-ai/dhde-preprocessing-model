@@ -1,2 +1,3 @@
 run_date,place_id,fetched,capped,covered_from,covered_to,rating_total,count_total
 2026-09-28,ChIJ8w9fldvl-F8RxirqCy78VTs,1000,True,2026-03-23,2026-09-27,4.1,18468
+2026-09-30,ChIJ8w9fldvl-F8RxirqCy78VTs,22,False,2026-09-24,2026-09-29,4.1,18475
