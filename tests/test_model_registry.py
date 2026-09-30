@@ -48,3 +48,14 @@ def test_compare_puts_the_latest_run_next_to_the_previous_one(tmp_path):
 
 def test_no_runs_yet_gives_an_empty_comparison(tmp_path):
     assert model_registry.compare(model_registry.load(tmp_path)).empty
+
+
+def test_monthly_runs_are_recorded_one_row_per_series(tmp_path):
+    fc = pd.DataFrame({"series": ["tojinbo"] * 2 + ["fukui_pref"], "month": ["2026-10", "2026-11", "2026-10"],
+                       "model": ["own_growth", "own_growth", "seasonal_naive"],
+                       "backtest_mape_pct": [9.1, 9.1, 7.0], "baseline_mape_pct": [10.4, 10.4, 7.0],
+                       "data_through": ["2026-08", "2026-08", "2026-08"]})
+    model_registry.record(model_registry.monthly_rows(fc), tmp_path)
+    table = model_registry.compare(model_registry.load(tmp_path), "monthly").set_index("series")
+    assert list(table.index) == ["tojinbo", "fukui_pref"]
+    assert table.loc["tojinbo", "error_pct"] == 9.1 and table.loc["tojinbo", "baseline_error_pct"] == 10.4

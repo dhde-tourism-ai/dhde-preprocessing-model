@@ -34,7 +34,11 @@ def main() -> None:
         return
     print(f"{args.forecast} forecast, run {table.attrs['version']} vs {table.attrs['prev_version'] or 'none'}"
           f" (backtest error %, lower is better)\n")
-    print(table.fillna("").to_markdown(index=False))
+    cells = table.astype(object).where(table.notna(), "")  # no tabulate needed for to_markdown
+    print("| " + " | ".join(table.columns) + " |")
+    print("|" + "---|" * len(table.columns))
+    for row in cells.itertuples(index=False):
+        print("| " + " | ".join(str(v) for v in row) + " |")
 
 
 if __name__ == "__main__":
