@@ -59,3 +59,20 @@ def test_monthly_runs_are_recorded_one_row_per_series(tmp_path):
     table = model_registry.compare(model_registry.load(tmp_path), "monthly").set_index("series")
     assert list(table.index) == ["tojinbo", "fukui_pref"]
     assert table.loc["tojinbo", "error_pct"] == 9.1 and table.loc["tojinbo", "baseline_error_pct"] == 10.4
+
+
+def test_two_runs_in_the_same_second_get_different_versions(tmp_path):
+    fc, _, _, models = forecast(_table(), weeks=4)
+    now = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    v0 = model_registry.record(model_registry.daily_rows(fc), tmp_path, models=models, now=now)
+    v1 = model_registry.record(model_registry.daily_rows(fc), tmp_path, models=models, now=now)
+    assert v1 == f"{v0}-2"
+    assert (tmp_path / "models" / v0 / "models.joblib").exists() and (tmp_path / "models" / v1 / "models.joblib").exists()
+    assert model_registry.compare(model_registry.load(tmp_path)).attrs["prev_version"] == v0
+
+
+def test_a_numeric_looking_commit_is_read_back_as_text(tmp_path):
+    rows = pd.DataFrame([["20260901-000000-1234e56", "2026-09-01T00:00:00+00:00", "1234e56", "daily", "tojinbo",
+                          "regression", "WAPE", 20.0, 30.0, "2026-08-31"]], columns=model_registry.COLUMNS)
+    rows.to_csv(tmp_path / model_registry.REGISTRY, index=False)
+    assert model_registry.load(tmp_path).loc[0, "commit"] == "1234e56"

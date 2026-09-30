@@ -3,7 +3,8 @@ A record of every forecast run: which model each node used, and how wrong
 it was in the backtest, so runs can be compared over time.
 
 Each run gets a version, `<UTC time>-<git commit>` (`+dirty` when tracked
-files had uncommitted changes, so the code can't be recovered from git).
+files had uncommitted changes, so the code can't be recovered from git;
+`-2`, `-3`... when a run in the same second already took the version).
 It appends one row per node (daily) or series (monthly) to
 `output/model_registry.csv`:
 
@@ -76,6 +77,13 @@ def record(rows: pd.DataFrame, output_dir: str = "output", models: dict | None =
     `models` next to it, and return the version."""
     version, trained_at, commit = new_version(now)
     out = Path(output_dir)
+    # Two runs in the same second on one commit: keep them apart, or compare()
+    # sees duplicate series and the second models.joblib overwrites the first.
+    taken = set(load(output_dir)["version"]) | {p.name for p in (out / "models").glob("*")}
+    base, n = version, 1
+    while version in taken:
+        n += 1
+        version = f"{base}-{n}"
     out.mkdir(parents=True, exist_ok=True)
     if models:
         (out / "models" / version).mkdir(parents=True, exist_ok=True)
@@ -88,7 +96,7 @@ def record(rows: pd.DataFrame, output_dir: str = "output", models: dict | None =
 
 def load(output_dir: str = "output") -> pd.DataFrame:
     path = Path(output_dir) / REGISTRY
-    return pd.read_csv(path, dtype={"data_through": str}) if path.exists() else pd.DataFrame(columns=COLUMNS)
+    return pd.read_csv(path, dtype={"version": str, "commit": str, "data_through": str}) if path.exists() else pd.DataFrame(columns=COLUMNS)
 
 
 def compare(registry: pd.DataFrame, forecast: str = "daily") -> pd.DataFrame:
