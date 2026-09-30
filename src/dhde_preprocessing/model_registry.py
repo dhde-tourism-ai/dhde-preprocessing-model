@@ -104,7 +104,7 @@ def compare(registry: pd.DataFrame, forecast: str = "daily") -> pd.DataFrame:
     prev = (runs[runs["version"] == versions[-2]].set_index("series") if len(versions) > 1
             else pd.DataFrame(columns=runs.columns).set_index("series"))
     table = pd.DataFrame({
-        "prev_model": prev["model"], "prev_error_pct": prev["error_pct"],
+        "prev_model": prev["model"], "prev_error_pct": prev["error_pct"].astype(float),
         "model": now["model"], "error_pct": now["error_pct"],
         "baseline_error_pct": now["baseline_error_pct"],
     }).loc[now.index]
