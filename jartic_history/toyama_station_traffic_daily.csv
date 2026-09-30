@@ -2,7 +2,7 @@ date,volume_total,volume_upstream,volume_downstream,hours_observed
 2026-06-29,,,,1
 2026-06-30,,,,11
 2026-07-01,,,,10
-2026-07-02,,,,18
+2026-07-02,,,,11
 2026-07-03,,,,24
 2026-07-04,,,,24
 2026-07-05,,,,24
@@ -92,4 +92,4 @@ date,volume_total,volume_upstream,volume_downstream,hours_observed
 2026-09-27,,,,24
 2026-09-28,,,,24
 2026-09-29,,,,24
-2026-09-30,,,,7
+2026-09-30,,,,14
