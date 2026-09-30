@@ -83,6 +83,6 @@ sources:
   rakuten:
     enabled: true  # Rakuten Travel availability, snapshotted daily (collect-rakuten.yml); see sources/rakuten.py
     search_radius_km: 3
-    # hotels within 3km of the Dinosaur Museum; Katsuyama has no hotel feed of its own
+    # hotels within 3km of the Dinosaur Museum; its `hotel` feed is the regional Echizen coast one, not a local one
     lead_days: [1, 7, 30]
     adult_num: 2
