@@ -13,7 +13,9 @@ hour in `{live_data_root}/weather_hourly/{node_key}.csv`:
   when it was fetched.
 - **observed**: the node's JMA station (the same ETRN pages and station as
   sources/weather.py) for the last OBSERVED_DAYS days. ETRN shows a day only
-  once it's over, so today's hours stay forecast until tomorrow. An observation
+  once it's over, so today's hours stay forecast until tomorrow. A day that
+  already has all 24 observed hours saved isn't fetched again, so most runs
+  ask JMA for nothing and yesterday is fetched once it appears. An observation
   replaces the forecast for its hour and is never replaced by a forecast,
   so the file becomes the observed history as the hours pass.
 
@@ -21,10 +23,15 @@ Older history (from each node's start_date) is the daily pipeline's
 `jma_cache/{node_key}_hourly.csv`; load_hourly_history() joins the two.
 Open-Meteo's forecast is for the node's grid point and JMA's observation
 is the station's, so the two can differ a little at the same hour (the
-`source` column tells them apart).
+`source` column tells them apart). In the older jma_cache days, an hour
+where JMA wrote `--` (no rain) is blank rather than 0.0: weather.py only
+reads `--` as 0.0 since this module was added, for days fetched after that.
+
+Forecast data: Open-Meteo (open-meteo.com), CC BY 4.0, based on JMA's models.
 """
 from __future__ import annotations
 
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -42,6 +49,7 @@ HISTORY_DIR = "weather_hourly"
 COLS = ["timestamp", "source", "temp_c", "precip_1h_mm", "wind_speed_ms", "humidity_pct",
         "weather_code", "issued_at"]
 JST = timezone(timedelta(hours=9))
+FETCH_PAUSE_S = 1.0  # between JMA page requests, as in weather.py's backfill
 
 
 def _forecast(lat: float, lon: float, issued_at: str) -> pd.DataFrame:
@@ -65,16 +73,32 @@ def _forecast(lat: float, lon: float, issued_at: str) -> pd.DataFrame:
     })
 
 
-def _observed(w_cfg: dict, today: date) -> tuple[pd.DataFrame, int]:
-    """JMA rows for the last OBSERVED_DAYS days, and how many days failed."""
+def _complete_days(saved: pd.DataFrame) -> set[date]:
+    """Days with all 24 hours observed. JMA labels an hour by its end, so a day's
+    hours run 01:00 to 24:00 (00:00 the next day)."""
+    obs = saved[saved["source"] == "observed"]
+    if obs.empty:
+        return set()
+    counts = (pd.to_datetime(obs["timestamp"]) - pd.Timedelta(hours=1)).dt.date.value_counts()
+    return set(counts[counts >= 24].index)
+
+
+def _observed(w_cfg: dict, today: date, saved: pd.DataFrame) -> tuple[pd.DataFrame, int, int]:
+    """JMA rows for the last OBSERVED_DAYS days not already complete in `saved`,
+    how many days were fetched, and how many failed."""
+    done = _complete_days(saved)
+    days = [today - timedelta(days=k) for k in range(OBSERVED_DAYS, 0, -1)]
+    days = [d for d in days if d not in done]
     rows, failed = [], 0
-    for k in range(OBSERVED_DAYS, 0, -1):
+    for i, d in enumerate(days):
+        if i:
+            time.sleep(FETCH_PAUSE_S)
         try:
-            rows += weather._fetch_day(w_cfg["prec_no"], w_cfg["block_no"], w_cfg["page"], today - timedelta(days=k))
+            rows += weather._fetch_day(w_cfg["prec_no"], w_cfg["block_no"], w_cfg["page"], d)
         except Exception:  # noqa: BLE001 - one bad day mustn't drop the others
             failed += 1
     if not rows:
-        return pd.DataFrame(columns=COLS), failed
+        return pd.DataFrame(columns=COLS), len(days), failed
     df = pd.DataFrame(rows)
     out = pd.DataFrame({"timestamp": pd.to_datetime(df["timestamp"]), "source": "observed"})
     for c in ("temp_c", "precip_1h_mm", "wind_speed_ms", "humidity_pct"):
@@ -82,7 +106,7 @@ def _observed(w_cfg: dict, today: date) -> tuple[pd.DataFrame, int]:
     out["weather_code"] = None
     out["issued_at"] = None
     # A row JMA hasn't filled yet (all blank) is not an observation.
-    return out.dropna(subset=["temp_c", "precip_1h_mm", "wind_speed_ms"], how="all")[COLS], failed
+    return out.dropna(subset=["temp_c", "precip_1h_mm", "wind_speed_ms"], how="all")[COLS], len(days), failed
 
 
 def merge(saved: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
@@ -129,10 +153,11 @@ def collect(node_cfg: dict, now: datetime | None = None) -> tuple[pd.DataFrame |
         notes.append(f"forecast failed ({msg}): kept the saved forecast")
 
     if w_cfg.get("enabled"):
-        obs, failed = _observed(w_cfg, now.astimezone(JST).date())
+        obs, fetched, failed = _observed(w_cfg, now.astimezone(JST).date(), saved)
         new.append(obs)
+        notes.append(f"JMA: fetched {fetched} of the last {OBSERVED_DAYS} days (the others were already complete)")
         if failed:
-            notes.append(f"{failed} of {OBSERVED_DAYS} JMA day(s) failed: retried next run")
+            notes.append(f"{failed} of {fetched} JMA day(s) failed: retried next run")
     else:
         notes.append("no JMA station for this node: forecast only")
 
@@ -141,8 +166,8 @@ def collect(node_cfg: dict, now: datetime | None = None) -> tuple[pd.DataFrame |
     if merged.empty:
         return None, SourceReport(source="weather_live", node_key=node_key, status="error",
                                    notes=notes + ["nothing fetched and nothing saved yet"])
-    if not merged.equals(saved):
-        write_csv(merged.assign(timestamp=merged["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")), path)
+    # Written every run: the live-data commit step only commits when the content changed.
+    write_csv(merged.assign(timestamp=merged["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")), path)
 
     n_obs = int((merged["source"] == "observed").sum())
     n_fc = int((merged["source"] == "forecast").sum())

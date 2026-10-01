@@ -27,6 +27,7 @@ def _hourly(times, precip, temp=15.0):
 def env(monkeypatch, tmp_path):
     monkeypatch.setattr(wl, "resolve_live_path", lambda p: str(tmp_path / "live" / p))
     monkeypatch.setattr(wl, "resolve_path", lambda p: str(tmp_path / "ws" / p))
+    monkeypatch.setattr(wl, "FETCH_PAUSE_S", 0)
     return tmp_path
 
 
@@ -44,7 +45,10 @@ def _serve(monkeypatch, payload=None, status=200, jma=None):
             raise payload
         return _Resp(payload, status)
     monkeypatch.setattr(wl.requests, "get", _get)
-    monkeypatch.setattr(wl.weather, "_fetch_day", lambda p, b, page, day: (jma or {}).get(str(day), []))
+    def _day(p, b, page, day):
+        calls.append(str(day))
+        return (jma or {}).get(str(day), [])
+    monkeypatch.setattr(wl.weather, "_fetch_day", _day)
     return calls
 
 
@@ -126,6 +130,24 @@ def test_nothing_fetched_and_nothing_saved_is_an_error(env, monkeypatch):
     _serve(monkeypatch, requests.ConnectionError())
     df, report = wl.collect(_cfg(), now=NOW)
     assert df is None and report.status == "error"
+
+
+def _full_day(day):
+    """JMA's 24 rows for `day`: 01:00 to 24:00 (00:00 the next day)."""
+    start = pd.Timestamp(day)
+    return [_obs(str(start + pd.Timedelta(hours=h)), 0.0) for h in range(1, 25)]
+
+
+def test_a_complete_day_is_not_fetched_again(env, monkeypatch):
+    jma = {"2026-09-28": _full_day("2026-09-28"), "2026-09-29": _full_day("2026-09-29"), "2026-09-30": _full_day("2026-09-30")[:10]}
+    calls = _serve(monkeypatch, _hourly(["2026-10-01 12:00"], [0.0]), jma=jma)
+    wl.collect(_cfg(), now=NOW)
+    assert [c for c in calls if isinstance(c, str)] == ["2026-09-28", "2026-09-29", "2026-09-30"]
+    # Next hour: 28 and 29 Sep are complete, 30 Sep (10 of 24 hours) is asked again.
+    calls = _serve(monkeypatch, _hourly(["2026-10-01 12:00"], [0.0]), jma=jma)
+    _, report = wl.collect(_cfg(), now=NOW.replace(hour=4))
+    assert [c for c in calls if isinstance(c, str)] == ["2026-09-30"]
+    assert any("fetched 1 of the last 3 days" in n for n in report.notes)
 
 
 def test_jma_no_precip_dash_reads_as_zero():
