@@ -90,9 +90,11 @@ def _extract_rows(df: pd.DataFrame, page_type: str) -> list[dict]:
         hour = _clean_cell(i_hour, vals)
         if not hour or not hour.isdigit():
             continue
+        # For precipitation JMA writes "--" when none fell (0), unlike "///" (missing).
+        no_precip = i_precip is not None and i_precip < len(vals) and str(vals[i_precip]).strip() == "--"
         rows.append({
             "hour": int(hour),
-            "precip_1h_mm": _clean_cell(i_precip, vals),
+            "precip_1h_mm": "0.0" if no_precip else _clean_cell(i_precip, vals),
             "temp_c": _clean_cell(i_temp, vals),
             "humidity_pct": _clean_cell(i_humidity, vals),
             "wind_speed_ms": _clean_cell(i_wind_speed, vals),
