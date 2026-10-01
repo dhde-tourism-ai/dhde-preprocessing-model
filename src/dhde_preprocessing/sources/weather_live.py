@@ -8,7 +8,7 @@ hourly collector (scripts/collect_live.py) and keeps one row per node and
 hour in `{live_data_root}/weather_hourly/{node_key}.csv`:
 
 - **forecast**: Open-Meteo's JMA model (`jma_seamless`, free, no key) at
-  the node's coordinates, for the next FORECAST_DAYS days. Each run
+  the node's coordinates, for today and the next FORECAST_DAYS - 1 days. Each run
   replaces the forecast rows with the newer forecast; `issued_at` says
   when it was fetched.
 - **observed**: the node's JMA station (the same ETRN pages and station as
@@ -36,7 +36,7 @@ from ..validation import SourceReport, unavailable_report
 from . import weather
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-FORECAST_DAYS = 7
+FORECAST_DAYS = 9  # today + 8: the dashboard shows today and the 7 days after it, with a day to spare
 OBSERVED_DAYS = 3  # yesterday and the 2 days before (ETRN has no page for today yet)
 HISTORY_DIR = "weather_hourly"
 COLS = ["timestamp", "source", "temp_c", "precip_1h_mm", "wind_speed_ms", "humidity_pct",
