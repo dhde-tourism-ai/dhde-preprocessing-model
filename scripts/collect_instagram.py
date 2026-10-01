@@ -144,6 +144,7 @@ def store(items: pd.DataFrame, node_key: str, location_id: str, limit: int | Non
               f"{items['error'].dropna().iloc[0]}; nothing recorded. Check instagram.location_id "
               f"in config/nodes/{node_key}.yaml")
         return
+    returned = len(items)
     if "locationId" in items:
         other = items["locationId"].notna() & (items["locationId"].astype(str) != location_id)
         if other.any():
@@ -152,7 +153,7 @@ def store(items: pd.DataFrame, node_key: str, location_id: str, limit: int | Non
     posts = ig.normalize(items, location_id)
     if since:
         posts = posts[posts["date"] >= since]
-    run = ig.run_summary(posts, location_id, run_date, limit, since)
+    run = ig.run_summary(posts, location_id, run_date, limit, since, returned)
     added, total = ig.append(node_key, posts, run)
     print(f"  {node_key}: {len(posts)} fetched, {added} new, {total} in the log; "
           f"covers {run['covered_from']} to {run['covered_to']}{' (capped)' if run['capped'] else ''}")
