@@ -21,10 +21,11 @@ that doesn't actually name the place isn't counted.
 
 What's kept: this repo and the `live-data` branch are public, so the log
 holds no text, usernames or links. Only a hash of the item id (to drop
-duplicates between runs), its platform, post or comment, time, its
+duplicates between runs), its platform, post or comment, day, its
 language, likes at scrape time, and the sentiment score, label and route
 (scored as written, converted from Traditional Chinese, or translated to
-English first; see sentiment.py).
+English first; see sentiment.py). The day, not the time: an exact time
+and a keyword find the post or comment, and with it who wrote it.
 
 Coverage, per platform: a run asks for items newer than the last
 covered day. A node's keyword search that hit its cap only covers back
@@ -51,7 +52,7 @@ from ..sentiment import lang_group
 
 LOG_DIR = "social"
 PLATFORMS = ["bluesky", "youtube", "reddit"]
-LOG_COLS = ["item_hash", "platform", "kind", "posted_at", "date", "language", "likes", "sentiment", "label",
+LOG_COLS = ["item_hash", "platform", "kind", "date", "language", "likes", "sentiment", "label",
             "route", "scraped_at"]
 RUN_COLS = ["run_date", "platform", "fetched", "capped", "covered_from", "covered_to"]
 # Language groups, as in google_reviews, plus Arabic.
@@ -106,7 +107,6 @@ def normalize(items: pd.DataFrame, scores: list | None = None, languages: list |
         "item_hash": [_hash(p, i) for p, i in zip(items["platform"], items["id"])],
         "platform": items["platform"].values,
         "kind": items["kind"].values,
-        "posted_at": ts.dt.strftime("%Y-%m-%dT%H:%M:%SZ").values,
         "date": ts.dt.tz_convert("Asia/Tokyo").dt.strftime("%Y-%m-%d").values,
         "language": [s.language if s else lang for s, lang in zip(scores, languages)],
         # Reddit scores go negative (downvotes); likes below 0 aren't likes.
@@ -148,7 +148,7 @@ def append(node_key: str, items: pd.DataFrame, runs: list[dict]) -> tuple[int, i
     before = set(old["item_hash"]) if old is not None else set()
     parts = [df for df in (old, items) if df is not None and not df.empty]
     log = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=LOG_COLS)
-    log = log.drop_duplicates("item_hash", keep="last").sort_values("posted_at")
+    log = log.drop_duplicates("item_hash", keep="last").sort_values("date", kind="stable")
     write_csv(log[LOG_COLS], path)
 
     runs_path = run_log_path(node_key)

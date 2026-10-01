@@ -58,10 +58,12 @@ jobs:
           pip install -r requirements.txt -r requirements-social.txt
 
       # The sentiment and translation models (~1.5 GB), downloaded once.
+      # Its own key: a cache is never overwritten, and Instagram's (which runs
+      # first) holds only the sentiment model, no translators.
       - uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-models-${{ hashFiles('src/dhde_preprocessing/sentiment.py') }}
+          key: hf-models-social-${{ hashFiles('src/dhde_preprocessing/sentiment.py') }}
 
       - name: Collect
         env:

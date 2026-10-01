@@ -226,3 +226,10 @@ def test_instagram_caption_sentiment_and_old_logs_without_it():
     assert d.loc["2026-09-28", "instagram_sentiment_mean"] == pytest.approx(0.9)
     old = posts.drop(columns=["sentiment", "label"])  # a log written before sentiment
     assert pd.isna(ig.to_daily(old, runs).set_index("date").loc["2026-09-28", "instagram_sentiment_mean"])
+
+
+def test_the_log_keeps_the_day_not_the_time(live_root):
+    items = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:23:45"}]))
+    sl.append("tojinbo", items, [_run("bluesky", "2026-09-28", "2026-10-04")])
+    text = open(sl.log_path("tojinbo"), encoding="utf-8").read()
+    assert "01:23" not in text and "2026-10-01" in text

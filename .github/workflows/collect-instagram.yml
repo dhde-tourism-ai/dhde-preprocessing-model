@@ -58,7 +58,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-models-${{ hashFiles('src/dhde_preprocessing/sentiment.py') }}
+          key: hf-models-instagram-${{ hashFiles('src/dhde_preprocessing/sentiment.py') }}
 
       - name: Collect
         env:
