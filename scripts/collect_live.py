@@ -11,6 +11,7 @@ under --out (default: history/):
     {out}/tomtom_cache/{node}_road_congestion.csv   one row per snapshot
     {out}/jartic_history/{node}_traffic_daily.csv   one row per day, merged
     {out}/weather_hourly/{node}.csv                 one row per hour: JMA observed, else the latest forecast
+    {out}/weather_warnings/{node}.csv               one row per JMA warning spell: first/last seen, active
 
 It is meant to run on a schedule (see .github/workflows/collect-live-data.yml),
 which commits --out to the `live-data` branch. The full build can then point
@@ -32,7 +33,7 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from dhde_preprocessing.config import list_configured_nodes, load_node_config
-from dhde_preprocessing.sources import road_congestion, weather_live
+from dhde_preprocessing.sources import road_congestion, weather_live, weather_warnings
 from dhde_preprocessing.sources.traffic import HISTORY_DIR, load_traffic
 from dhde_preprocessing.validation import print_report
 
@@ -49,6 +50,7 @@ def main() -> int:
     jartic_dir.mkdir(parents=True, exist_ok=True)
 
     failures = 0
+    jma_offices: dict = {}  # each JMA warnings file is fetched once per run, nodes share them
     for node_key in list_configured_nodes():
         cfg = load_node_config(node_key)
         print(f"\n=== {node_key} ===")
@@ -65,6 +67,10 @@ def main() -> int:
             failures += 1
 
         df, report = weather_live.collect(cfg)
+        print_report(report)
+        failures += report.status == "error"
+
+        df, report = weather_warnings.collect(cfg, fetched=jma_offices)
         print_report(report)
         failures += report.status == "error"
 
