@@ -77,3 +77,7 @@ sources:
       Instagram location id not found yet. Look it up with the Collect
       Instagram posts workflow (find_places: 福井駅, Fukui Station), then set
       location_id and enabled: true.
+
+  social_listening:
+    enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py
+    keywords: ["福井駅", "福井站", "Fukui Station", "후쿠이역"]

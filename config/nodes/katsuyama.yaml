@@ -90,3 +90,8 @@ sources:
   instagram:
     enabled: true  # Instagram posts tagged here, weekly via Apify (collect-instagram.yml); see sources/instagram.py
     location_id: "307321308"  # instagram.com/explore/locations/307321308/, page title "福井県立恐竜博物館" (checked 2026-10-01)
+
+  social_listening:
+    enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py
+    # every word must appear: 恐竜博物館 alone also finds other museums
+    keywords: ["恐竜博物館 福井", "恐龍博物館 福井", "恐龙博物馆 福井", "Fukui dinosaur", "후쿠이 공룡"]

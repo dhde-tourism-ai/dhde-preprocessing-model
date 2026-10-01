@@ -79,3 +79,8 @@ sources:
   instagram:
     enabled: true  # Instagram posts tagged here, weekly via Apify (collect-instagram.yml); see sources/instagram.py
     location_id: "265778687"  # instagram.com/explore/locations/265778687/, page title "永平寺" (checked 2026-10-01)
+
+  social_listening:
+    enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py
+    # 永平寺 also names the town (永平寺町): town news counts too
+    keywords: ["永平寺", "Eiheiji", "에이헤이지"]

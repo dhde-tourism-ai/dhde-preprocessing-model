@@ -25,6 +25,7 @@ from .sources.instagram import load_instagram
 from .sources.info_desk import load_info_desk
 from .sources.monthly_visitors import load_monthly_visitors
 from .sources.rakuten import load_rakuten
+from .sources.social_listening import load_social_listening
 from .sources.road_congestion import load_road_congestion
 from .sources.rsi import load_rsi
 from .sources.survey import daily_summary as survey_daily, load_survey
@@ -46,17 +47,18 @@ SOURCE_LOADERS = {
     "visitor_reservation": load_visitor_reservation,  # attraction entry bookings, where a feed exists
     "google_reviews": load_google_reviews,  # new Google Maps reviews per day, where a place_id is set
     "instagram": load_instagram,  # Instagram posts tagged at the site per day, where a location_id is set
+    "social_listening": load_social_listening,  # Bluesky/YouTube/Reddit mentions and sentiment, where keywords are set
     # survey is handled separately below — it's response-level, not date-unique
 }
 
 # Sources only some nodes declare (info_desk exists for Kanazawa only;
 # monthly_visitors, rakuten, road_congestion, footfall_proxy,
-# visitor_reservation, google_reviews and instagram are opt-in per node). Skipped entirely when absent from
+# visitor_reservation, google_reviews, instagram and social_listening are opt-in per node). Skipped entirely when absent from
 # a node's config, so existing nodes' output and coverage reports don't
 # change until their config opts in.
 OPTIONAL_SOURCES = {"info_desk", "monthly_visitors", "rakuten",
                     "road_congestion", "footfall_proxy", "visitor_reservation", "google_reviews",
-                    "instagram"}
+                    "instagram", "social_listening"}
 
 
 def _run_loader(source_name: str, loader, node_cfg: dict):

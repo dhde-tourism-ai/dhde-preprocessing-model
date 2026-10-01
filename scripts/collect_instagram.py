@@ -45,6 +45,7 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from dhde_preprocessing.config import list_configured_nodes, load_node_config
+from dhde_preprocessing.sentiment import try_load_scorer
 from dhde_preprocessing.sources import instagram as ig
 
 APIFY = "https://api.apify.com/v2"
@@ -133,7 +134,7 @@ def find_places(names: list[str], token: str, per_name: int = 5) -> None:
 
 
 def store(items: pd.DataFrame, node_key: str, location_id: str, limit: int | None, since: str | None,
-          run_date: str) -> None:
+          run_date: str, scorer=None) -> None:
     """Add one location's posts to its logs.
 
     Posts tagged at another location (the actor sometimes returns a
@@ -149,7 +150,7 @@ def store(items: pd.DataFrame, node_key: str, location_id: str, limit: int | Non
         if other.any():
             print(f"  {node_key}: dropped {int(other.sum())} post(s) tagged at another location")
             items = items[~other]
-    posts = ig.normalize(items, location_id)
+    posts = ig.normalize(items, location_id, scorer)
     if since:
         posts = posts[posts["date"] >= since]
     run = ig.run_summary(posts, location_id, run_date, limit, since)
@@ -184,7 +185,7 @@ def main() -> int:
         if not (args.node and args.location_id):
             parser.error("--import needs --node and --location-id")
         items = pd.concat([read_export(p) for p in args.imports], ignore_index=True)
-        store(items, args.node, str(args.location_id), args.limit, None, today.isoformat())
+        store(items, args.node, str(args.location_id), args.limit, None, today.isoformat(), try_load_scorer())
         return 0
 
     locs = configured_locations()
@@ -194,12 +195,13 @@ def main() -> int:
         print("::warning::APIFY_TOKEN not set, no posts collected")
         return 0
 
+    scorer = try_load_scorer()
     failures = 0
     for node_key, location_id in locs.items():
         since = ig.since_date(node_key) or (today - timedelta(days=args.first_days)).isoformat()
         try:
             store(scrape(location_id, since, args.limit, token), node_key, location_id, args.limit, since,
-                  today.isoformat())
+                  today.isoformat(), scorer)
         except Exception as e:  # noqa: BLE001 - one failed location shouldn't lose the others
             failures += 1
             print(f"  {node_key}: failed this run: {e}")

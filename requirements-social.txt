@@ -1,0 +1,12 @@
+# Collection-time extras for social media (scripts/collect_social.py) and
+# caption sentiment (scripts/collect_instagram.py). The pipeline's build
+# doesn't need these: see src/dhde_preprocessing/sentiment.py.
+# In CI, torch is installed first from the CPU index (much smaller).
+#   pip install -r requirements.txt -r requirements-social.txt
+torch>=2.1
+transformers>=4.40,<5
+sentencepiece>=0.1.99   # opus-mt translation tokenizers
+sacremoses>=0.1         # opus-mt translation tokenizers
+# Anugra's collector, pinned: collect_social.py reads its database tables.
+# [lang] = lingua language detection, [zh] = OpenCC for Traditional/Simplified Chinese.
+social-collector[lang,zh] @ git+https://github.com/anugraaa-rizky/social-media-scraping@1f553782ef2917a87d6a326c2d49a7eaeb5bc342

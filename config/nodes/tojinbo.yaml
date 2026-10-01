@@ -75,3 +75,7 @@ sources:
       Instagram location id not found yet. Look it up with the Collect
       Instagram posts workflow (find_places: 東尋坊, Tojinbo), then set
       location_id and enabled: true.
+
+  social_listening:
+    enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py
+    keywords: ["東尋坊", "东寻坊", "Tojinbo", "도진보"]
