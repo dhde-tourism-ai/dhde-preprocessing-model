@@ -85,3 +85,27 @@ def test_load_instagram_without_a_log_is_an_error_not_a_crash(live_root):
     cfg = {"node_key": "tojinbo", "sources": {"instagram": {"enabled": True, "location_id": "123"}}}
     df, report = ig.load_instagram(cfg)
     assert df is None and report.status == "error"
+
+
+def test_a_run_that_hit_the_cap_is_capped_even_after_posts_are_dropped(live_root):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import collect_instagram
+
+    # 3 items returned, the cap: one tagged at another place, so 2 are kept.
+    items = _items([
+        {"id": "1", "timestamp": "2026-09-25T01:00:00Z", "locationId": "123"},
+        {"id": "2", "timestamp": "2026-09-28T01:00:00Z", "locationId": "123"},
+        {"id": "3", "timestamp": "2026-09-29T01:00:00Z", "locationId": "999"},
+    ])
+    collect_instagram.store(items, "tojinbo", "123", 3, "2026-09-10", "2026-10-05")
+    run = pd.read_csv(ig.run_log_path("tojinbo")).iloc[0]
+    assert bool(run["capped"]) and run["covered_from"] == "2026-09-26"  # not 09-10: older posts were cut off
+
+
+def test_the_log_keeps_the_day_not_the_time(live_root):
+    posts = ig.normalize(_items([{"id": "1", "timestamp": "2026-09-28T01:23:45Z"}]), "123")
+    ig.append("tojinbo", posts, ig.run_summary(posts, "123", "2026-09-30", 200, "2026-09-27"))
+    text = open(ig.post_log_path("tojinbo"), encoding="utf-8").read()
+    assert "01:23" not in text and "2026-09-28" in text

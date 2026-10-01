@@ -15,10 +15,12 @@ like the Google reviews; it can also import an export someone ran by hand.
 
 What's kept: this repo and the `live-data` branch are public, so the log
 holds no usernames, captions, links or images. Only a hash of the post
-id (to drop duplicates between runs), the time, the kind, the like and
+id (to drop duplicates between runs), the day, the kind, the like and
 comment counts at scrape time, the caption's script, and its sentiment
 score and label (sentiment.py), worked out while the caption is in
-memory. Logs from before sentiment have those empty.
+memory. Logs from before sentiment have those empty. The day, not the
+time: a post's exact time and location find it on Instagram, and with it
+the account that posted it.
 
 Caption script is a rough market proxy, like the review language: kana
 means Japanese, hangul Korean, Chinese characters without kana Chinese,
@@ -48,7 +50,7 @@ from ..config import read_csv_if_exists, resolve_live_path, write_csv
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 LOG_DIR = "instagram"
-POST_COLS = ["post_hash", "location_id", "posted_at", "date", "kind", "likes", "comments", "script", "sentiment",
+POST_COLS = ["post_hash", "location_id", "date", "kind", "likes", "comments", "script", "sentiment",
              "label", "scraped_at"]
 RUN_COLS = ["run_date", "location_id", "fetched", "capped", "covered_from", "covered_to"]
 JST = timezone(timedelta(hours=9))
@@ -110,7 +112,6 @@ def normalize(items: pd.DataFrame, location_id: str, scorer=None) -> pd.DataFram
     out = pd.DataFrame({
         "post_hash": items["id"].map(_hash),
         "location_id": str(location_id),
-        "posted_at": pd.to_datetime(items["timestamp"], utc=True, errors="coerce").dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "date": _jst_date(items["timestamp"]),
         "kind": items.get("type", pd.Series(index=items.index, dtype=object)).map(KINDS).fillna("other"),
         # Instagram reports -1 when the owner hides the like count.
@@ -125,15 +126,19 @@ def normalize(items: pd.DataFrame, location_id: str, scorer=None) -> pd.DataFram
 
 
 def run_summary(posts: pd.DataFrame, location_id: str, run_date: str, limit: int | None,
-                since: str | None) -> dict:
+                since: str | None, returned: int | None = None) -> dict:
     """One run_log row: the days this run fully covers.
 
     A capped run (hit the per-location limit) covers from the day after
     its oldest post, since that day may have more posts it didn't get.
     An uncapped run covers from `since`, or from its oldest post on a
     first run without one. The run day itself is only partly over.
+
+    `returned` is how many items the scraper gave back before any were
+    dropped (other locations, before `since`): the cap applies to that,
+    not to the posts kept.
     """
-    capped = bool(limit) and len(posts) >= limit
+    capped = bool(limit) and (len(posts) if returned is None else returned) >= limit
     oldest = posts["date"].min() if len(posts) else None
     if capped:
         covered_from = (pd.Timestamp(oldest) + timedelta(days=1)).date().isoformat()
@@ -157,7 +162,7 @@ def append(node_key: str, posts: pd.DataFrame, run: dict) -> tuple[int, int]:
     before = set(old["post_hash"]) if old is not None else set()
     parts = [df for df in (old, posts) if df is not None and not df.empty]
     log = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=POST_COLS)
-    log = log.drop_duplicates("post_hash", keep="last").sort_values("posted_at")
+    log = log.drop_duplicates("post_hash", keep="last").sort_values("date", kind="stable")
     write_csv(log.reindex(columns=POST_COLS), path)
 
     runs_path = run_log_path(node_key)
