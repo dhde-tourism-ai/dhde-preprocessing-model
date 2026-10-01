@@ -68,3 +68,10 @@ sources:
     # the hotels within 3km are Mikuni's; the app's Echizen coast area uses this node
     lead_days: [1, 7, 30]
     adult_num: 2
+
+  instagram:
+    enabled: false
+    reason: >
+      Instagram location id not found yet. Look it up with the Collect
+      Instagram posts workflow (find_places: 東尋坊, Tojinbo), then set
+      location_id and enabled: true.

@@ -81,6 +81,7 @@ SOURCE_PREFIX = {
     "footfall_proxy": "proxy_",
     "visitor_reservation": "attraction_",
     "google_reviews": "reviews_",
+    "instagram": "instagram_",
 }
 FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope", "weather_station"]
 
@@ -90,7 +91,7 @@ FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope",
 # history), and Fukui, Kyoto and Osaka tables line up. An expected column
 # with no data at all is a warning in the report, not a missing column.
 EXPECTED_COLUMNS = FRONT_COLUMNS + [
-    "has_camera", "has_footfall_proxy", "has_google_reviews", "has_hotel", "has_monthly_visitors", "has_rakuten",
+    "has_camera", "has_footfall_proxy", "has_google_reviews", "has_hotel", "has_instagram", "has_monthly_visitors", "has_rakuten",
     "has_road_congestion", "has_rsi", "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
     "camera_count", "camera_gate1_vehicle_count", "camera_gate2_vehicle_count",
     "weather_precip", "weather_temp", "weather_wind", "weather_sun", "weather_humidity", "weather_snow_depth",
@@ -116,6 +117,8 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     *[f"reviews_lang_{g}{s}" for g in ("ja", "en", "zh_hant", "zh_hans", "ko", "other")
       for s in ("", "_stars_mean")],
     "reviews_rating_total", "reviews_count_total",
+    "instagram_posts", "instagram_photos", "instagram_videos", "instagram_likes", "instagram_comments",
+    *[f"instagram_script_{s}" for s in ("ja", "ko", "zh", "latin", "none")],
 ]
 
 SURVEY_COUNT = "survey_response_count"
