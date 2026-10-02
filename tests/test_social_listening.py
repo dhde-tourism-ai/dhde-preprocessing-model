@@ -238,3 +238,38 @@ def test_the_log_keeps_the_day_not_the_time(live_root):
 def test_social_likes_are_rounded():
     out = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:00:00", "like_count": 23}]))
     assert out["likes"].tolist() == [20]
+
+
+# ---- no false zeros, no forced labels (first live run, 2026-10-02) ----
+
+def test_instagram_empty_result_records_nothing(live_root, capsys):
+    import collect_instagram
+    collect_instagram.store(pd.DataFrame(), "katsuyama", "307321308", 200, "2026-09-04", "2026-10-02")
+    assert not Path(ig.run_log_path("katsuyama")).exists()  # missing, not 28 days of 0
+    assert "nothing recorded" in capsys.readouterr().out
+
+
+def test_a_platform_with_no_posts_for_any_keyword_covers_nothing():
+    posts = pd.DataFrame(columns=["platform", "query", "date"])
+    empty = [{"query": k, "posts_seen": 0, "completed": True, "error": None} for k in ("東尋坊", "Tojinbo")]
+    assert collect_social.node_coverage("bluesky", ["東尋坊"], posts, empty, "2026-10-05", "2026-09-28")[:2] \
+        == (None, None)
+    # One keyword with posts is enough to trust the others' zeros.
+    some = [{**empty[0], "posts_seen": 3}, empty[1]]
+    assert collect_social.node_coverage("bluesky", ["Tojinbo"], posts, some, "2026-10-05", "2026-09-28")[:2] \
+        == ("2026-09-28", "2026-10-04")
+
+
+@pytest.mark.parametrize("score,label", [(0.6, "positive"), (0.2, "positive"), (0.19, "neutral"),
+                                         (-0.14, "neutral"), (-0.2, "negative"), (None, None)])
+def test_label_comes_from_the_score(score, label):
+    assert sentiment.label_of(score) == label
+
+
+def test_daily_counts_relabel_old_rows_from_the_score():
+    # A row written before NEUTRAL_BAND: the model said "negative" for -0.14.
+    log = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:00:00"}]),
+                       [Result(-0.14, "negative", "ja", "native")])
+    runs = pd.DataFrame([_run("bluesky", "2026-10-01", "2026-10-01")])
+    day = sl.to_daily(log, runs).set_index("date").iloc[0]
+    assert (day["social_neutral"], day["social_negative"]) == (1, 0)

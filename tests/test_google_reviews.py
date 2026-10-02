@@ -132,13 +132,13 @@ def test_a_run_with_no_new_reviews_still_counts_as_zero(live, monkeypatch):
     assert len(by.loc["2026-09-22":"2026-09-28"]) == 7
     assert by.loc["2026-09-28", "reviews_count_total"] == 1001
 
-    # Without even a place row, the week is still covered; only the totals are missing.
+    # Without even a place row there's no sign the scraper reached the place: that week stays
+    # missing, not 0 (the 2026-10-02 Instagram run returned nothing for two busy sites).
     monkeypatch.setattr(collector, "datetime", type("N", (), {"now": staticmethod(
         lambda tz: pd.Timestamp("2026-10-06T10:00:00", tz=tz).to_pydatetime())}))
     collector.store(pd.DataFrame(), PLACE, "tojinbo", 300, "2026-09-26", live=True)
     df, _ = gr.load_google_reviews(_cfg())
-    by = df.set_index("date")
-    assert by.loc["2026-10-05", "reviews_new"] == 0 and pd.isna(by.loc["2026-10-05", "reviews_count_total"])
+    assert "2026-10-05" not in df.set_index("date").index.strftime("%Y-%m-%d")
 
 
 def test_a_header_only_log_reads_zero_reviews_not_a_crash(live):
@@ -149,7 +149,8 @@ def test_a_header_only_log_reads_zero_reviews_not_a_crash(live):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
     import collect_google_reviews as collector
 
-    collector.store(pd.DataFrame(), PLACE, "tojinbo", 300, "2026-09-20", live=True)
+    place_only = pd.DataFrame([{"placeId": PLACE, "reviewId": None, "totalScore": 4.3, "reviewsCount": 0}])
+    collector.store(place_only, PLACE, "tojinbo", 300, "2026-09-20", live=True)
     assert pd.read_csv(live / "google_reviews" / "tojinbo.csv").empty
     df, report = gr.load_google_reviews(_cfg())
     assert report.status == "ok"

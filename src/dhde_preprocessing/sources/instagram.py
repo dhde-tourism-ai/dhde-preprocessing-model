@@ -57,6 +57,7 @@ import pandas as pd
 
 from ..config import read_csv_if_exists, resolve_live_path, write_csv
 from ..lang import chinese_variant
+from ..sentiment import label_of
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 LOG_DIR = "instagram"
@@ -221,6 +222,7 @@ def to_daily(posts: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
     p = p[p["date"].isin(days)]
     for col in ("likes", "comments", "sentiment"):
         p[col] = pd.to_numeric(p[col], errors="coerce")
+    p["label"] = p["sentiment"].map(label_of)  # from the score: logs from before NEUTRAL_BAND too
     g = p.groupby("date")
     daily = pd.DataFrame({
         "instagram_posts": g.size(),

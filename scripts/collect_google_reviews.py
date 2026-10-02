@@ -102,7 +102,9 @@ def store(items: pd.DataFrame, place_id: str, node_key: str, max_reviews: int | 
 
     A live run returning reviews under another place id (Google merged or
     moved the listing) records nothing either: marking those days 0 would
-    hide real reviews, and they'd never be fetched again."""
+    hide real reviews, and they'd never be fetched again. Nor does a live
+    run without the place's own row: 0 new reviews is only believable when
+    the scraper shows it reached the place."""
     with_review = items[items["reviewId"].notna()] if "reviewId" in items else items.iloc[0:0]
     p_items = with_review[with_review["placeId"] == place_id] if "placeId" in with_review else with_review.iloc[0:0]
     if p_items.empty:
@@ -114,6 +116,11 @@ def store(items: pd.DataFrame, place_id: str, node_key: str, max_reviews: int | 
             print(f"::warning::{node_key}: {len(with_review)} review(s) came back under place id(s) "
                   f"{', '.join(other) or '(none)'}, not {place_id}; nothing recorded. The listing may have "
                   f"moved: check it and update google_reviews.place_id in config/nodes/{node_key}.yaml")
+            return
+        if not (("placeId" in items) and (items["placeId"] == place_id).any()):
+            # Not even the place's own row: no sign the scraper reached it, so no days are covered.
+            print(f"::warning::{node_key}: the scraper returned nothing for place {place_id}; nothing recorded "
+                  "(missing, not 0). Check the run in the Apify console.")
             return
         run = gr.empty_run(items, place_id, datetime.now(gr.JST).date().isoformat(), since)
         _, total = gr.append(node_key, pd.DataFrame(columns=gr.REVIEW_COLS), run)

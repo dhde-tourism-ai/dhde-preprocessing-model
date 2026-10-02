@@ -139,7 +139,13 @@ def read_db(db: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, list[dict]]
 
 def node_coverage(platform: str, kws: list[str], posts: pd.DataFrame, queries: list[dict], run_date: str,
                   since: str | None) -> tuple:
-    """(covered_from, covered_to, capped) for one node on one platform."""
+    """(covered_from, covered_to, capped) for one node on one platform.
+
+    A platform that returned no posts for any keyword covers nothing: with
+    two dozen place names, an empty week means the searches didn't work
+    (a block, an API change), not that nobody posted."""
+    if queries and not any(q.get("posts_seen", 0) for q in queries):
+        return None, None, False
     by_query = {q["query"]: q for q in queries}
     capped_oldest = None
     for k in platform_keywords(platform, kws):

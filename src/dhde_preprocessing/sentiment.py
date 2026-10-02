@@ -25,8 +25,11 @@ languages (NATIVE). Each item goes one of three routes:
 Translations stay in memory and are never saved.
 
 Score = P(positive) - P(negative), from -1 to 1, the scale the app's
-Sentiment layer draws. Label = the most likely of positive / neutral /
-negative. A first model to replace later: check it against
+Sentiment layer draws. Label from the score: positive from +NEUTRAL_BAND,
+negative from -NEUTRAL_BAND, neutral between. Not the model's most likely
+label: it almost never picks neutral (29 of 1,552 items on the first run,
+while a third scored between -0.3 and +0.3), so a mild -0.14 came out
+"negative" and both shares were overstated. A first model to replace later: check it against
 hand-labelled items (scripts/collect_social.py --sample-out) before
 trusting small differences.
 
@@ -45,6 +48,7 @@ NATIVE = {"ar", "zh", "zh-Hans", "en", "fr", "de", "hi", "id", "it", "ja", "ms",
 TRANSLATORS = {"ko": "Helsinki-NLP/opus-mt-ko-en"}
 TRANSLATOR_ANY = "Helsinki-NLP/opus-mt-mul-en"
 LABELS = ("positive", "neutral", "negative")
+NEUTRAL_BAND = 0.2
 MAX_TOKENS = 256  # long YouTube descriptions: the start carries the tone
 
 _URL = re.compile(r"https?://\S+")
@@ -72,12 +76,22 @@ def clean(text) -> str:
     return _SPACE.sub(" ", _MENTION.sub(" ", _URL.sub(" ", text))).strip()
 
 
+def label_of(score) -> str | None:
+    """positive / neutral / negative from a score, None for a missing one."""
+    try:
+        s = float(score)
+    except (TypeError, ValueError):
+        return None
+    if s != s:  # NaN
+        return None
+    return "positive" if s >= NEUTRAL_BAND else "negative" if s <= -NEUTRAL_BAND else "neutral"
+
+
 def from_probs(probs: dict[str, float]) -> tuple[float, str]:
     """{label: probability} -> (score, label)."""
     p = {k.lower(): float(v) for k, v in probs.items()}
     score = round(p.get("positive", 0.0) - p.get("negative", 0.0), 4)
-    label = max(LABELS, key=lambda k: p.get(k, 0.0))
-    return score, label
+    return score, label_of(score)
 
 
 def route(language: str | None) -> str:
