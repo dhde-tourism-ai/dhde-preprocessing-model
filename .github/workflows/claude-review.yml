@@ -1,0 +1,55 @@
+name: Claude PR review
+
+# Reviews every non-draft PR opened from a branch in this repo, and again on each push.
+# Auth: set ONE of these secrets (org-level or repo-level):
+#   CLAUDE_CODE_OAUTH_TOKEN  - from `claude setup-token` (uses a Claude Pro/Max subscription)
+#   ANTHROPIC_API_KEY        - pay-per-use API key from console.anthropic.com
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Fork PRs can't read secrets, and drafts aren't ready yet.
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          use_sticky_comment: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. Use `gh pr diff` and `gh pr view` to read it,
+            and read surrounding files when you need context.
+
+            Focus on real problems, most important first:
+            - Bugs and incorrect logic, including data-handling mistakes (wrong joins,
+              timezone/date handling, units, silent NaN/None handling, off-by-one ranges)
+            - Security issues (secrets in code, unsafe input handling)
+            - Missing or broken tests for changed behaviour
+
+            Post each specific issue as an inline comment on the relevant line.
+            Then post one short summary comment. If you find nothing worth changing,
+            say so in one line. Skip style nitpicks and praise.
+          claude_args: |
+            --model claude-sonnet-5
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
