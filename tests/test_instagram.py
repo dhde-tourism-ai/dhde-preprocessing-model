@@ -122,3 +122,13 @@ def test_counts_are_rounded_so_a_post_cant_be_picked_out():
     posts = ig.normalize(_items([{"id": "1", "timestamp": "2026-09-28T01:00:00Z", "likesCount": 1234,
                                   "commentsCount": 17}]), "123")
     assert (posts["likes"].iloc[0], posts["comments"].iloc[0]) == (1230, 15)
+
+
+def test_a_second_run_on_the_same_day_keeps_the_first_runs_coverage(live_root):
+    empty = ig.normalize(pd.DataFrame(), "123")
+    run = {"run_date": "2026-10-05", "location_id": "123", "fetched": 0, "capped": False}
+    ig.append("tojinbo", empty, {**run, "covered_from": "2026-09-01", "covered_to": "2026-10-04"})
+    ig.append("tojinbo", empty, {**run, "covered_from": "2026-10-02", "covered_to": "2026-10-04"})
+    ig.append("tojinbo", empty, {**run, "covered_from": "2026-10-02", "covered_to": "2026-10-04"})  # no-op
+    runs = pd.read_csv(ig.run_log_path("tojinbo"), dtype={"location_id": str})
+    assert len(runs) == 2 and len(ig.covered_days(runs)) == 34  # 1 Sep to 4 Oct

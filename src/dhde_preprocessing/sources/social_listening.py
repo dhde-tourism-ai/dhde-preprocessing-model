@@ -157,7 +157,10 @@ def append(node_key: str, items: pd.DataFrame, runs: list[dict]) -> tuple[int, i
     old_runs = read_csv_if_exists(runs_path)
     new_runs = pd.DataFrame(runs, columns=RUN_COLS)
     all_runs = pd.concat([old_runs, new_runs], ignore_index=True) if old_runs is not None else new_runs
-    all_runs = all_runs.drop_duplicates(["run_date", "platform"], keep="last").sort_values(["run_date", "platform"])
+    # Keyed on the coverage too: a second run on the same day (a manual rerun) covers
+    # other days, and replacing the first run's row would drop days it covered.
+    # The same run imported twice is still a no-op.
+    all_runs = all_runs.drop_duplicates(["run_date", "platform", "covered_from", "covered_to"], keep="last").sort_values(["run_date", "platform"], kind="stable")
     write_csv(all_runs[RUN_COLS], runs_path)
     new = set(items["item_hash"]) - before if not items.empty else set()
     return len(new), len(log)

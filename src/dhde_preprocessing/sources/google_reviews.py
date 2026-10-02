@@ -158,7 +158,13 @@ def append(node_key: str, reviews: pd.DataFrame, run: dict) -> tuple[int, int]:
     runs = read_csv_if_exists(runs_path)
     new_run = pd.DataFrame([run])
     runs = pd.concat([runs, new_run], ignore_index=True) if runs is not None else new_run
-    runs = runs.drop_duplicates(["run_date", "place_id"], keep="last").sort_values("run_date")
+    # Keyed on the coverage too: a second run on the same day (a manual rerun) covers
+    # other days, and replacing the first run's row would drop days it covered.
+    # The same run imported twice is still a no-op.
+    # Stable, so of two runs on one day the later stays last (reviews read the totals
+    # from the last row).
+    runs = runs.drop_duplicates(["run_date", "place_id", "covered_from", "covered_to"], keep="last").sort_values(
+        "run_date", kind="stable")
     write_csv(runs[RUN_COLS], runs_path)
     return len(set(reviews["review_hash"]) - before), len(log)
 

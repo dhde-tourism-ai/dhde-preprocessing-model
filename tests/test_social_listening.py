@@ -275,3 +275,14 @@ def test_daily_counts_relabel_old_rows_from_the_score():
     runs = pd.DataFrame([_run("bluesky", "2026-10-01", "2026-10-01")])
     day = sl.to_daily(log, runs).set_index("date").iloc[0]
     assert (day["social_neutral"], day["social_negative"]) == (1, 0)
+
+
+def test_a_second_run_on_the_same_day_keeps_the_first_runs_coverage(live_root):
+    # 2026-10-02: a manual rerun replaced the morning's run row, so 4 to 28 Sep read uncovered.
+    empty = sl.normalize(_items([]))
+    sl.append("tojinbo", empty, [_run("bluesky", "2026-09-04", "2026-10-01", "2026-10-02")])
+    sl.append("tojinbo", empty, [_run("bluesky", "2026-09-29", "2026-10-01", "2026-10-02")])
+    sl.append("tojinbo", empty, [_run("bluesky", "2026-09-29", "2026-10-01", "2026-10-02")])  # same run again: no-op
+    runs = pd.read_csv(sl.run_log_path("tojinbo"))
+    assert len(runs) == 2
+    assert len(sl.covered_days(runs)) == 28  # 4 Sep to 1 Oct
