@@ -86,3 +86,10 @@ sources:
     # the summit is remote: few Rakuten hotels are within 3km (Rakuten's maximum)
     lead_days: [1, 7, 30]
     adult_num: 2
+
+  instagram:
+    enabled: false
+    reason: >
+      Instagram location id not found yet. Look it up with the Collect
+      Instagram posts workflow (find_places: レインボーライン山頂公園, Rainbow Line), then set
+      location_id and enabled: true.

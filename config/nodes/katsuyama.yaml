@@ -92,3 +92,7 @@ sources:
     # hotels within 3km of the Dinosaur Museum; its `hotel` feed is the regional Echizen coast one, not a local one
     lead_days: [1, 7, 30]
     adult_num: 2
+
+  instagram:
+    enabled: true  # Instagram posts tagged here, weekly via Apify (collect-instagram.yml); see sources/instagram.py
+    location_id: "307321308"  # instagram.com/explore/locations/307321308/, page title "福井県立恐竜博物館" (checked 2026-10-01)
