@@ -18,7 +18,9 @@ from bosai/common/const/area.json):
 Like the other live sources, JMA keeps no history, so each run (with the
 hourly collector) updates `{live_data_root}/weather_warnings/{node_key}.csv`:
 one row per warning spell, with when it was first and last seen in force
-and `active` while it still is.
+and `active` while it still is. The collector runs 06:15 to 21:15 JST, so a
+warning issued and lifted overnight is never seen, and one lifted overnight
+shows as ending at the last daytime run.
 """
 from __future__ import annotations
 
@@ -71,18 +73,28 @@ def name_of(hazard: str, level: int) -> tuple[str, str]:
     return f"{prefix}{ja}{lja}", f"{en} {len_}" + (f" (level {level})" if hazard in LEVELLED else "")
 
 
-def in_force(reports: list, areas: list[str]) -> dict[str, str]:
-    """{code: report datetime} for the warnings in force in any of `areas`."""
+def in_force(reports: list, areas: list[str]) -> tuple[dict[str, str], set[str], set[str]]:
+    """({code: report datetime} for the warnings in force in any of `areas`,
+    the areas the file lists, codes in force that CODES doesn't know)."""
+    if not isinstance(reports, list):
+        raise ValueError(f"expected a list of reports, got {type(reports).__name__}")
     out: dict[str, str] = {}
+    seen: set[str] = set()
+    unknown: set[str] = set()
     for rep in reports:
         for item in (rep.get("warning") or {}).get("class20Items") or []:
             if item.get("areaCode") not in areas:
                 continue
+            seen.add(item["areaCode"])
             for k in item.get("kinds") or []:
                 code = k.get("code")
-                if code in CODES and k.get("status") not in NOT_IN_FORCE:
+                if not code or k.get("status") in NOT_IN_FORCE:
+                    continue
+                if code in CODES:
                     out[code] = max(out.get(code, ""), rep.get("reportDatetime") or "")
-    return out
+                else:
+                    unknown.add(code)
+    return out, seen, unknown
 
 
 def update(saved: pd.DataFrame, now_force: dict[str, str], now: str) -> pd.DataFrame:
@@ -129,16 +141,21 @@ def collect(node_cfg: dict, now: datetime | None = None,
             if resp.status_code != 200:
                 raise RuntimeError(f"JMA returned HTTP {resp.status_code}")
             fetched[office] = resp.json()
-        reports = fetched[office]
-    except (requests.RequestException, RuntimeError, ValueError) as e:
-        msg = str(e) if isinstance(e, RuntimeError) else type(e).__name__
+        areas = [str(a) for a in cfg["areas"]]
+        now_force, seen, unknown = in_force(fetched[office], areas)
+        if not seen:
+            # Not "none in force": the file doesn't cover this node, so closing its open spells would be wrong.
+            raise RuntimeError(f"none of the node's areas ({', '.join(areas)}) are in JMA's file")
+    except (requests.RequestException, RuntimeError, ValueError, AttributeError, TypeError) as e:
+        msg = str(e) if isinstance(e, (RuntimeError, ValueError)) else type(e).__name__
         return (saved if not saved.empty else None), SourceReport(
             source="weather_warnings", node_key=node_key, status="error",
-            notes=[f"JMA warnings fetch failed ({msg}): history unchanged"])
+            notes=[f"JMA warnings unreadable ({msg}): history unchanged"])
 
-    now_force = in_force(reports, [str(a) for a in cfg["areas"]])
     table = update(saved, now_force, now_s)
     write_csv(table, path)
     active = table[table["active"].astype(bool)]  # an empty object column would select columns
     notes = [f"in force now: {', '.join(active['name_en']) or 'none'}", f"{len(table)} warning spell(s) on record"]
+    if unknown:
+        notes.append(f"in force but not in the code table, so not saved: {', '.join(sorted(unknown))}")
     return table, SourceReport(source="weather_warnings", node_key=node_key, status="ok", row_count=len(table), notes=notes)

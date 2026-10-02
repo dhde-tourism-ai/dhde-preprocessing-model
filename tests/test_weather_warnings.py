@@ -57,8 +57,8 @@ def test_names_follow_jma_levels():
 def test_lifted_and_none_are_not_in_force():
     reports = [_report("2026-10-01T09:00:00+09:00", {
         "1821000": [("10", "発表"), ("15", "解除")], "1820100": [("14", "継続")], "1820600": [(None, "発表警報・注意報はなし")]})]
-    assert ww.in_force(reports, ["1821000"]) == {"10": "2026-10-01T09:00:00+09:00"}
-    assert set(ww.in_force(reports, ["1821000", "1820100"])) == {"10", "14"}
+    assert ww.in_force(reports, ["1821000"])[0] == {"10": "2026-10-01T09:00:00+09:00"}
+    assert set(ww.in_force(reports, ["1821000", "1820100"])[0]) == {"10", "14"}
 
 
 def test_a_spell_opens_extends_and_closes(env, monkeypatch):
@@ -109,6 +109,24 @@ def test_a_failed_fetch_leaves_the_history_alone(env, monkeypatch, failure):
     df, report = ww.collect(_cfg(), now=T0.replace(hour=4))
     assert report.status == "error" and list(df["active"]) == [True]
     assert pd.read_csv(env / ww.HISTORY_DIR / "n.csv")["last_seen"].iloc[0] == "2026-10-01T03:00+00:00"
+
+
+@pytest.mark.parametrize("payload", [{}, [{"warning": "?"}], [_report("2026-10-01T10:00:00+09:00", {"1820100": [("10", "発表")]})]])
+def test_a_file_that_doesnt_cover_the_node_leaves_the_history_alone(env, monkeypatch, payload):
+    # Not a list, a malformed report, or a file without the node's area: none of them means "lifted".
+    _serve(monkeypatch, [_report("2026-10-01T09:00:00+09:00", {"1821000": [("10", "発表")]})])
+    ww.collect(_cfg(), now=T0)
+    _serve(monkeypatch, payload)
+    df, report = ww.collect(_cfg(), now=T0.replace(hour=4))
+    assert report.status == "error" and "history unchanged" in report.notes[0]
+    assert list(pd.read_csv(env / ww.HISTORY_DIR / "n.csv")["active"]) == [True]
+
+
+def test_codes_not_in_the_table_are_reported(env, monkeypatch):
+    _serve(monkeypatch, [_report("2026-10-01T09:00:00+09:00", {"1821000": [("10", "発表"), ("98", "発表"), ("97", "解除")]})])
+    df, report = ww.collect(_cfg(), now=T0)
+    assert list(df["code"]) == ["10"]
+    assert report.notes[-1] == "in force but not in the code table, so not saved: 98"
 
 
 def test_no_warnings_on_a_first_run(env, monkeypatch):
