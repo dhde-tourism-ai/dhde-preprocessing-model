@@ -20,6 +20,12 @@ sources:
       rainbow-line gates are present, checked 2026-09-27). Do not fabricate
       one — this gap stays visible in the coverage report as "unavailable."
 
+  jma_warning:
+    # JMA warnings in force (sources/weather_warnings.py): office and municipality
+    # (class20) codes from bosai/common/const/area.json.
+    office: "180000"  # 福井県
+    areas: ["1820800"]  # あわら市
+
   weather:
     enabled: true
     station_name: "三国 (Mikuni)"

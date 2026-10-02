@@ -19,6 +19,12 @@ sources:
         person_csv: fukui-kanko-people-flow-data/full/tojinbo-shotaro/Person.csv
         face_csv: fukui-kanko-people-flow-data/full/tojinbo-shotaro/Face.csv
 
+  jma_warning:
+    # JMA warnings in force (sources/weather_warnings.py): office and municipality
+    # (class20) codes from bosai/common/const/area.json.
+    office: "180000"  # 福井県
+    areas: ["1821000"]  # 坂井市
+
   weather:
     enabled: true
     station_name: "三国 (Mikuni)"

@@ -25,6 +25,12 @@ sources:
       rainbow-line gates are present). Do not fabricate one — this gap is
       real and stays visible in the coverage report as "unavailable."
 
+  jma_warning:
+    # JMA warnings in force (sources/weather_warnings.py): office and municipality
+    # (class20) codes from bosai/common/const/area.json.
+    office: "180000"  # 福井県
+    areas: ["1820600"]  # 勝山市
+
   weather:
     enabled: true
     station_name: "勝山 (Katsuyama)"

@@ -28,6 +28,12 @@ sources:
         license_plate_csv: fukui-kanko-people-flow-data/full/rainbow-line-parking-lot-2-gate/LicensePlate.csv
         face_csv: fukui-kanko-people-flow-data/full/rainbow-line-parking-lot-2-gate/Face.csv
 
+  jma_warning:
+    # JMA warnings in force (sources/weather_warnings.py): office and municipality
+    # (class20) codes from bosai/common/const/area.json.
+    office: "180000"  # 福井県
+    areas: ["1844200", "1850100"]  # 美浜町, 若狭町: the road crosses both
+
   weather:
     enabled: true
     station_name: "美浜 (Mihama)"

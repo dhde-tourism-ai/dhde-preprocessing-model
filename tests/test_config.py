@@ -64,7 +64,7 @@ def test_every_node_config_loads(node_key):
     required = {"camera", "weather", "rsi", "hotel", "survey", "traffic"}
     optional = {"info_desk", "monthly_visitors", "rakuten",
                 "footfall_proxy", "visitor_reservation", "road_congestion", "google_reviews",
-                "instagram"}
+                "jma_warning", "instagram"}
     assert required <= set(cfg["sources"]) <= required | optional
     # A proxy only makes sense where the node has no camera of its own.
     if cfg["sources"].get("footfall_proxy", {}).get("enabled"):
