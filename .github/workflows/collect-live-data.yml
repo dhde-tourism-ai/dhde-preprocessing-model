@@ -1,7 +1,8 @@
 name: Collect live data
 
 # JARTIC (~3 months retention) and TomTom (live only) can't be backfilled,
-# so their history only exists if we save it. Runs hourly 06:15-21:15 JST
+# so their history only exists if we save it. Hourly weather (JMA observed,
+# Open-Meteo JMA forecast ahead) is saved with them. Runs hourly 06:15-21:15 JST
 # and commits to the `live-data` branch, keeping main free of data commits.
 # Needs the TOMTOM_API_KEY repository secret; without it only JARTIC runs.
 
