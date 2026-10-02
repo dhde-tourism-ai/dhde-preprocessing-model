@@ -63,6 +63,10 @@ FIRST_DAYS = 28
 # Posts per keyword per run. YouTube: one search page (50) costs 100 of the
 # 10,000 daily quota units, so ~30 keywords fit with room for comments.
 LIMITS = {"bluesky": 100, "youtube": 50, "reddit": 100}
+# Where a week without a single post for any keyword isn't believable. The first
+# run (2026-10-02) found 939 YouTube and 334 Bluesky posts in 28 days, so about
+# 80 a week on Bluesky alone; Reddit gets a Fukui post now and then.
+EMPTY_IS_FAILURE = {"youtube", "bluesky"}
 # Comments per post. A popular video has more: its comments are undercounted
 # (the run prints how many posts hit this), but coverage isn't affected.
 COMMENT_LIMIT = 100
@@ -141,10 +145,11 @@ def node_coverage(platform: str, kws: list[str], posts: pd.DataFrame, queries: l
                   since: str | None) -> tuple:
     """(covered_from, covered_to, capped) for one node on one platform.
 
-    A platform that returned no posts for any keyword covers nothing: with
-    two dozen place names, an empty week means the searches didn't work
-    (a block, an API change), not that nobody posted."""
-    if queries and not any(q.get("posts_seen", 0) for q in queries):
+    On a platform in EMPTY_IS_FAILURE, no posts for any keyword covers
+    nothing: an empty week there means the searches didn't work (a block,
+    an API change), not that nobody posted. Reddit is left out: a week
+    with no post naming a Fukui site can be real there."""
+    if platform in EMPTY_IS_FAILURE and queries and not any(q.get("posts_seen", 0) for q in queries):
         return None, None, False
     by_query = {q["query"]: q for q in queries}
     capped_oldest = None

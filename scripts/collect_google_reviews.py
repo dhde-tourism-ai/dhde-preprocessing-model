@@ -104,7 +104,9 @@ def store(items: pd.DataFrame, place_id: str, node_key: str, max_reviews: int | 
     moved the listing) records nothing either: marking those days 0 would
     hide real reviews, and they'd never be fetched again. Nor does a live
     run without the place's own row: 0 new reviews is only believable when
-    the scraper shows it reached the place."""
+    the scraper shows it reached the place. If the actor leaves that row out
+    on a quiet week (Rainbow Line in winter), the week reads missing, not 0:
+    the safer error."""
     with_review = items[items["reviewId"].notna()] if "reviewId" in items else items.iloc[0:0]
     p_items = with_review[with_review["placeId"] == place_id] if "placeId" in with_review else with_review.iloc[0:0]
     if p_items.empty:

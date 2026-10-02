@@ -18,6 +18,10 @@ on:
         description: "Only look up Instagram place ids for these names (comma-separated); collects nothing"
         required: false
         default: ""
+      first_days:
+        description: "How far a node's first run looks back, in days (default 28). 35 after the 2026-10-02 cleanup covers 4 Sep"
+        required: false
+        default: "28"
 
 permissions:
   contents: write
@@ -64,11 +68,12 @@ jobs:
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           FIND_PLACES: ${{ inputs.find_places }}
+          FIRST_DAYS: ${{ inputs.first_days || '28' }}
         run: |
           if [ -n "$FIND_PLACES" ]; then
             python scripts/collect_instagram.py --find-places "$FIND_PLACES"
           else
-            python scripts/collect_instagram.py --out history
+            python scripts/collect_instagram.py --out history --first-days "$FIRST_DAYS"
           fi
 
       - name: Commit to live-data

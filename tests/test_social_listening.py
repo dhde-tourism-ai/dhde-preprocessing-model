@@ -254,6 +254,8 @@ def test_a_platform_with_no_posts_for_any_keyword_covers_nothing():
     empty = [{"query": k, "posts_seen": 0, "completed": True, "error": None} for k in ("東尋坊", "Tojinbo")]
     assert collect_social.node_coverage("bluesky", ["東尋坊"], posts, empty, "2026-10-05", "2026-09-28")[:2] \
         == (None, None)
+    # Reddit: a week with no post naming a Fukui site can be real, so it stays 0.
+    assert collect_social.node_coverage("reddit", ["Tojinbo"], posts, empty, "2026-10-05", "2026-09-28")[:2]         == ("2026-09-28", "2026-10-04")
     # One keyword with posts is enough to trust the others' zeros.
     some = [{**empty[0], "posts_seen": 3}, empty[1]]
     assert collect_social.node_coverage("bluesky", ["Tojinbo"], posts, some, "2026-10-05", "2026-09-28")[:2] \
