@@ -51,6 +51,9 @@ def main() -> int:
 
     failures = 0
     jma_offices: dict = {}  # each JMA warnings file is fetched once per run, nodes share them
+    # One Open-Meteo request for every node's forecast (one per node timed out half the time).
+    forecasts = weather_live.fetch_forecasts([load_node_config(k) for k in list_configured_nodes()])
+    print(f"Open-Meteo: forecasts for {len(forecasts)} node(s) in one request")
     for node_key in list_configured_nodes():
         cfg = load_node_config(node_key)
         print(f"\n=== {node_key} ===")
@@ -66,7 +69,7 @@ def main() -> int:
         elif report.status == "error":
             failures += 1
 
-        df, report = weather_live.collect(cfg)
+        df, report = weather_live.collect(cfg, forecasts=forecasts)
         print_report(report)
         failures += report.status == "error"
 

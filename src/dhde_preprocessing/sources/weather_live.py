@@ -49,18 +49,39 @@ HISTORY_DIR = "weather_hourly"
 COLS = ["timestamp", "source", "temp_c", "precip_1h_mm", "wind_speed_ms", "humidity_pct",
         "weather_code", "issued_at"]
 JST = timezone(timedelta(hours=9))
+FORECAST_RETRIES = 3
+RETRY_PAUSE_S = 5.0  # x attempt, between Open-Meteo retries
 FETCH_PAUSE_S = 1.0  # between JMA page requests, as in weather.py's backfill
 
 
-def _forecast(lat: float, lon: float, issued_at: str) -> pd.DataFrame:
-    resp = requests.get(FORECAST_URL, timeout=30, params={
-        "latitude": lat, "longitude": lon, "models": "jma_seamless", "timezone": "Asia/Tokyo",
-        "forecast_days": FORECAST_DAYS, "wind_speed_unit": "ms",
-        "hourly": "temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,weather_code",
-    })
-    if resp.status_code != 200:
-        raise RuntimeError(f"Open-Meteo returned HTTP {resp.status_code}")
-    h = resp.json()["hourly"]
+def _get_forecast(lats: list[float], lons: list[float]) -> list[dict]:
+    """Open-Meteo's answer for these points, one per point in order. Retried: from
+    GitHub's runners about half the one-point requests timed out."""
+    last: Exception | None = None
+    for attempt in range(1, FORECAST_RETRIES + 1):
+        try:
+            resp = requests.get(FORECAST_URL, timeout=60, params={
+                "latitude": ",".join(map(str, lats)), "longitude": ",".join(map(str, lons)),
+                "models": "jma_seamless", "timezone": "Asia/Tokyo",
+                "forecast_days": FORECAST_DAYS, "wind_speed_unit": "ms",
+                "hourly": "temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,weather_code",
+            })
+            if resp.status_code != 200:
+                raise RuntimeError(f"Open-Meteo returned HTTP {resp.status_code}")
+            body = resp.json()
+            out = body if isinstance(body, list) else [body]  # one point: a single object
+            if len(out) != len(lats):
+                raise RuntimeError(f"Open-Meteo returned {len(out)} points for {len(lats)}")
+            return out
+        except (requests.RequestException, RuntimeError, ValueError) as e:
+            last = e
+            if attempt < FORECAST_RETRIES:
+                time.sleep(RETRY_PAUSE_S * attempt)
+    raise last  # type: ignore[misc]
+
+
+def _frame(point: dict, issued_at: str) -> pd.DataFrame:
+    h = point["hourly"]
     return pd.DataFrame({
         "timestamp": pd.to_datetime(h["time"]),
         "source": "forecast",
@@ -71,6 +92,20 @@ def _forecast(lat: float, lon: float, issued_at: str) -> pd.DataFrame:
         "weather_code": h["weather_code"],
         "issued_at": issued_at,
     })
+
+
+def fetch_forecasts(node_cfgs: list[dict], now: datetime | None = None) -> dict[str, pd.DataFrame]:
+    """Every node's forecast in one request, for collect(forecasts=...). Empty if it fails;
+    collect() then asks for its own node."""
+    nodes = [n for n in node_cfgs if {"lat", "lon"} <= set(n.get("coordinates") or {})]
+    if not nodes:
+        return {}
+    issued_at = (now or datetime.now(timezone.utc)).isoformat(timespec="minutes")
+    try:
+        points = _get_forecast([n["coordinates"]["lat"] for n in nodes], [n["coordinates"]["lon"] for n in nodes])
+        return {n["node_key"]: _frame(p, issued_at) for n, p in zip(nodes, points)}
+    except (requests.RequestException, RuntimeError, KeyError, ValueError, TypeError):
+        return {}
 
 
 def _complete_days(saved: pd.DataFrame) -> set[date]:
@@ -133,8 +168,10 @@ def _read(path: str) -> pd.DataFrame:
     return df
 
 
-def collect(node_cfg: dict, now: datetime | None = None) -> tuple[pd.DataFrame | None, SourceReport]:
-    """Fetch this hour's forecast and the latest observations, merge them into the saved file."""
+def collect(node_cfg: dict, now: datetime | None = None,
+            forecasts: dict[str, pd.DataFrame] | None = None) -> tuple[pd.DataFrame | None, SourceReport]:
+    """Fetch this hour's forecast and the latest observations, merge them into the saved file.
+    `forecasts` (from fetch_forecasts) saves a request per node; a node missing from it asks itself."""
     node_key = node_cfg["node_key"]
     w_cfg = node_cfg["sources"].get("weather", {})
     c = node_cfg.get("coordinates") or {}
@@ -147,8 +184,11 @@ def collect(node_cfg: dict, now: datetime | None = None) -> tuple[pd.DataFrame |
     notes, new = [], []
 
     try:
-        new.append(_forecast(c["lat"], c["lon"], now.isoformat(timespec="minutes")))
-    except (requests.RequestException, RuntimeError, KeyError, ValueError) as e:
+        if forecasts and node_key in forecasts:
+            new.append(forecasts[node_key])
+        else:
+            new.append(_frame(_get_forecast([c["lat"]], [c["lon"]])[0], now.isoformat(timespec="minutes")))
+    except (requests.RequestException, RuntimeError, KeyError, ValueError, TypeError) as e:
         msg = str(e) if isinstance(e, RuntimeError) else type(e).__name__
         notes.append(f"forecast failed ({msg}): kept the saved forecast")
 
