@@ -160,7 +160,7 @@ def append(node_key: str, items: pd.DataFrame, runs: list[dict]) -> tuple[int, i
     # Keyed on the coverage too: a second run on the same day (a manual rerun) covers
     # other days, and replacing the first run's row would drop days it covered.
     # The same run imported twice is still a no-op.
-    all_runs = all_runs.drop_duplicates(["run_date", "platform", "covered_from", "covered_to"], keep="last").sort_values(["run_date", "platform"])
+    all_runs = all_runs.drop_duplicates(["run_date", "platform", "covered_from", "covered_to"], keep="last").sort_values(["run_date", "platform"], kind="stable")
     write_csv(all_runs[RUN_COLS], runs_path)
     new = set(items["item_hash"]) - before if not items.empty else set()
     return len(new), len(log)

@@ -192,3 +192,15 @@ def test_disabled_is_unavailable_with_its_reason():
     cfg = {"node_key": "awara_onsen", "sources": {"google_reviews": {"enabled": False, "reason": "no place yet"}}}
     df, report = gr.load_google_reviews(cfg)
     assert df is None and report.status == "unavailable" and report.notes == ["no place yet"]
+
+
+def test_two_runs_on_one_day_keep_both_coverages_and_the_reruns_totals(live):
+    empty = pd.DataFrame(columns=gr.REVIEW_COLS)
+    run = {"run_date": "2026-10-05", "place_id": PLACE, "fetched": 0, "capped": False, "covered_to": "2026-10-04"}
+    gr.append("tojinbo", empty, {**run, "covered_from": "2026-09-01", "rating_total": 4.1, "count_total": 100})
+    gr.append("tojinbo", empty, {**run, "covered_from": "2026-10-02", "rating_total": 4.2, "count_total": 103})
+    df, report = gr.load_google_reviews(_cfg())
+    by = df.set_index("date")
+    assert len(by) == 34  # the morning's 1 Sep to 4 Oct, not just the rerun's 3 days
+    assert by.loc["2026-10-04", "reviews_count_total"] == 103  # the later run's totals
+    assert "103" in " ".join(report.notes)
