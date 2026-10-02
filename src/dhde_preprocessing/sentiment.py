@@ -9,6 +9,9 @@ since a comment's language often differs from its post's. Script rules
 for Japanese, Korean and Chinese, Traditional (Taiwan, Hong Kong) told
 apart from Simplified with OpenCC, and the lingua detector for the rest
 (Arabic, Thai, Vietnamese, English and other Latin-script languages).
+Its rule calls kanji with little or no kana Chinese, so "#東尋坊 #福井"
+came out Chinese; lang.fix_chinese keeps Chinese only where a character
+or word only Chinese uses says so, else Japanese.
 
 Sentiment model: lxyuan/distilbert-base-multilingual-cased-sentiments-
 student (Apache 2.0, 0.1B parameters, runs on a CPU), trained on 12
@@ -101,6 +104,8 @@ def load_scorer(model: str = MODEL, batch_size: int = 32) -> Scorer:
     the first time a language needs one.
     """
     from collector.core.text import detect_language
+
+    from .lang import fix_chinese
     from opencc import OpenCC
     from transformers import pipeline
 
@@ -110,7 +115,9 @@ def load_scorer(model: str = MODEL, batch_size: int = 32) -> Scorer:
     translators: dict[str, tuple] = {}
 
     def translate(texts: list[str], language: str) -> list[str]:
-        # The model itself, not pipeline("translation"): transformers 5 dropped that task.
+        # The model itself, not pipeline("translation"), so this still works on
+        # transformers 5, which dropped that task. requirements-social.txt pins <5
+        # for now anyway (untested on 5 in CI).
         import torch
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -130,7 +137,7 @@ def load_scorer(model: str = MODEL, batch_size: int = 32) -> Scorer:
     def score(texts: Sequence[str | None], hints: Sequence[str | None] | None = None) -> list[Result | None]:
         hints = hints or [None] * len(texts)
         cleaned = [clean(t) for t in texts]
-        langs = [detect_language(t, h) if t else None for t, h in zip(cleaned, hints)]
+        langs = [fix_chinese(detect_language(t, h), t) if t else None for t, h in zip(cleaned, hints)]
         ready = list(cleaned)
         for i, (t, lang) in enumerate(zip(cleaned, langs)):
             if t and route(lang) == "converted":

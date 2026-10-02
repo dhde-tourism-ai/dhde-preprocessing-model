@@ -105,9 +105,9 @@ def test_append_dedupes_and_since_is_per_platform(live_root):
     first = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:00:00", "like_count": 2}]))
     runs = [_run("bluesky", "2026-09-28", "2026-10-04"), _run("youtube", None, None)]
     assert sl.append("tojinbo", first, runs) == (1, 1)
-    again = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:00:00", "like_count": 7}]))
+    again = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:00:00", "like_count": 38}]))
     assert sl.append("tojinbo", again, runs) == (0, 1)
-    assert pd.read_csv(sl.log_path("tojinbo"))["likes"].tolist() == [7]
+    assert pd.read_csv(sl.log_path("tojinbo"))["likes"].tolist() == [40]  # latest count, rounded
     assert sl.since_date("tojinbo", "bluesky") == "2026-10-02"
     assert sl.since_date("tojinbo", "youtube") is None  # failed run: start over from first-days
 
@@ -233,3 +233,8 @@ def test_the_log_keeps_the_day_not_the_time(live_root):
     sl.append("tojinbo", items, [_run("bluesky", "2026-09-28", "2026-10-04")])
     text = open(sl.log_path("tojinbo"), encoding="utf-8").read()
     assert "01:23" not in text and "2026-10-01" in text
+
+
+def test_social_likes_are_rounded():
+    out = sl.normalize(_items([{"id": "a", "created_at": "2026-10-01 01:00:00", "like_count": 23}]))
+    assert out["likes"].tolist() == [20]

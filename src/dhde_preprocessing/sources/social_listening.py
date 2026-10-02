@@ -25,7 +25,8 @@ duplicates between runs), its platform, post or comment, day, its
 language, likes at scrape time, and the sentiment score, label and route
 (scored as written, converted from Traditional Chinese, or translated to
 English first; see sentiment.py). The day, not the time: an exact time
-and a keyword find the post or comment, and with it who wrote it.
+and a keyword find the post or comment, and with it who wrote it. Likes
+are rounded to the nearest 10 for the same reason.
 
 Coverage, per platform: a run asks for items newer than the last
 covered day. A node's keyword search that hit its cap only covers back
@@ -49,6 +50,7 @@ import pandas as pd
 from ..config import read_csv_if_exists, resolve_live_path, write_csv
 from ..validation import SourceReport, unavailable_report, validate_daily
 from ..sentiment import lang_group
+from .instagram import round_to
 
 LOG_DIR = "social"
 PLATFORMS = ["bluesky", "youtube", "reddit"]
@@ -110,7 +112,7 @@ def normalize(items: pd.DataFrame, scores: list | None = None, languages: list |
         "date": ts.dt.tz_convert("Asia/Tokyo").dt.strftime("%Y-%m-%d").values,
         "language": [s.language if s else lang for s, lang in zip(scores, languages)],
         # Reddit scores go negative (downvotes); likes below 0 aren't likes.
-        "likes": likes.where(likes >= 0).values,
+        "likes": round_to(likes.where(likes >= 0), 10).values,
         "sentiment": [s.score if s else None for s in scores],
         "label": [s.label if s else None for s in scores],
         "route": [s.route if s else None for s in scores],

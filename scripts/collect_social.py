@@ -54,6 +54,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
 from dhde_preprocessing.config import list_configured_nodes, load_node_config
+from dhde_preprocessing.lang import fix_chinese
 from dhde_preprocessing.sentiment import try_load_scorer
 from dhde_preprocessing.sources import social_listening as sl
 from dhde_preprocessing.sources.instagram import JST
@@ -62,6 +63,8 @@ FIRST_DAYS = 28
 # Posts per keyword per run. YouTube: one search page (50) costs 100 of the
 # 10,000 daily quota units, so ~30 keywords fit with room for comments.
 LIMITS = {"bluesky": 100, "youtube": 50, "reddit": 100}
+# Comments per post. A popular video has more: its comments are undercounted
+# (the run prints how many posts hit this), but coverage isn't affected.
 COMMENT_LIMIT = 100
 SECRETS = {
     "bluesky": [],
@@ -241,7 +244,8 @@ def main() -> int:
         if scorer is None and len(everything):
             try:
                 from collector.core.text import detect_language
-                lang = {(r.platform, r.kind, r.id): detect_language(r.text or "") for r in everything.itertuples()}
+                lang = {(r.platform, r.kind, r.id): fix_chinese(detect_language(r.text or ""), r.text)
+                        for r in everything.itertuples()}
             except ImportError:
                 print("::warning::social-collector not installed: no language either")
 
@@ -258,8 +262,22 @@ def main() -> int:
                              "covered_from": frm, "covered_to": to})
                 print(f"  {node_key} {p}: {len(df)} item(s), "
                       + (f"covers {frm} to {to}{' (capped)' if capped else ''}" if frm else "no coverage this run"))
-            added, total = sl.append(node_key, pd.concat(items, ignore_index=True), runs)
+            node_items = pd.concat(items, ignore_index=True)
+            added, total = sl.append(node_key, node_items, runs)
             print(f"  {node_key}: {added} new, {total} in the log")
+            # For checking a run by eye before the app shows it as real.
+            if len(node_items):
+                langs = node_items["language"].fillna("unknown").value_counts()
+                print(f"    languages: {', '.join(f'{k} {v}' for k, v in langs.items())}")
+                scored_n = node_items["sentiment"].notna().sum()
+                if scored_n:
+                    print(f"    sentiment: mean {node_items['sentiment'].mean():+.2f} over {scored_n}, "
+                          f"{(node_items['label'] == 'positive').sum()} positive, "
+                          f"{(node_items['label'] == 'negative').sum()} negative")
+            full = comments[comments["post_id"].isin(pd.concat(per_node[node_key])["id"])].groupby("post_id").size()
+            if (full >= COMMENT_LIMIT).any():
+                print(f"    {int((full >= COMMENT_LIMIT).sum())} post(s) hit the {COMMENT_LIMIT}-comment cap: "
+                      "their comments are undercounted")
 
         if args.sample_out and scored:
             sample = everything.sample(min(args.sample_size, len(everything)), random_state=0)
