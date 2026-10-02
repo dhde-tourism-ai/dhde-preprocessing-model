@@ -18,19 +18,28 @@ holds no usernames, captions, links or images. Only a hash of the post
 id (to drop duplicates between runs), the day, the kind, the like and
 comment counts at scrape time and the caption's script. The day, not the
 time: a post's exact time and location find it on Instagram, and with it
-the account that posted it.
+the account that posted it. Likes are rounded to the nearest 10 and
+comments to the nearest 5 for the same reason: at a quiet location, the
+day plus an exact pair of counts picks out one post. Daily sums of
+rounded counts are close, not exact.
 
 Caption script is a rough market proxy, like the review language: kana
-means Japanese, hangul Korean, Chinese characters without kana Chinese,
-Latin letters only "latin" (English and most European languages). It
-says nothing about who posted.
+means Japanese, hangul Korean, Latin letters only "latin" (English and
+most European languages). Kanji without kana is Japanese unless it has a
+character or word only Chinese uses (lang.py): short Japanese captions
+are often kanji only ("大本山永平寺参拝"), so "zh" is a floor for Chinese
+posts, not an estimate. It says nothing about who posted.
 
 Coverage: a run asks for posts newer than the last covered day and
 stops at a cap, so a capped run only covers back to its oldest post.
 Each run records the days it fully covers (`covered_from` to
 `covered_to`); on those days a day without posts is a real 0, outside
 them it stays missing. Likes and comments keep growing after a post
-goes up, so they're counts at scrape time, not final totals.
+goes up, so they're counts at scrape time, not final totals, and posts
+aren't re-scraped once past the 2-day overlap. A weekly run sees the
+day before it about a day old and the start of its week about a week
+old, so likes per day follow the weekday of the run as much as
+engagement: compare weekly totals, don't chart likes by day.
 
 Files, under the live-data root:
     instagram/{node_key}.csv        one row per post
@@ -45,6 +54,7 @@ from datetime import timedelta, timezone
 import pandas as pd
 
 from ..config import read_csv_if_exists, resolve_live_path, write_csv
+from ..lang import chinese_variant
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 LOG_DIR = "instagram"
@@ -82,7 +92,8 @@ def caption_script(caption) -> str:
     """The script a caption is written in, hashtags and mentions left out.
 
     Kana wins over Chinese characters (Japanese mixes both); Korean wins
-    over Latin (Korean captions often add English tags-as-words).
+    over Latin (Korean captions often add English tags-as-words). Kanji
+    alone is Japanese unless lang.chinese_variant finds a Chinese-only mark.
     """
     text = _TAG.sub(" ", caption) if isinstance(caption, str) else ""
     if _KANA.search(text):
@@ -90,10 +101,15 @@ def caption_script(caption) -> str:
     if _HANGUL.search(text):
         return "ko"
     if _HAN.search(text):
-        return "zh"
+        return "zh" if chinese_variant(text) else "ja"
     if _LATIN.search(text):
         return "latin"
     return "none"
+
+
+def round_to(values: pd.Series, step: int) -> pd.Series:
+    """Nearest multiple of `step`, missing kept: exact counts help find a post."""
+    return (values / step).round() * step
 
 
 def normalize(items: pd.DataFrame, location_id: str) -> pd.DataFrame:
@@ -108,8 +124,8 @@ def normalize(items: pd.DataFrame, location_id: str) -> pd.DataFrame:
         "date": _jst_date(items["timestamp"]),
         "kind": items.get("type", pd.Series(index=items.index, dtype=object)).map(KINDS).fillna("other"),
         # Instagram reports -1 when the owner hides the like count.
-        "likes": likes.where(likes >= 0),
-        "comments": pd.to_numeric(items.get("commentsCount"), errors="coerce"),
+        "likes": round_to(likes.where(likes >= 0), 10),
+        "comments": round_to(pd.to_numeric(items.get("commentsCount"), errors="coerce"), 5),
         "script": items.get("caption", pd.Series(index=items.index, dtype=object)).map(caption_script),
         "scraped_at": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ"),
     })
