@@ -139,7 +139,16 @@ def store(items: pd.DataFrame, node_key: str, location_id: str, limit: int | Non
 
     Posts tagged at another location (the actor sometimes returns a
     related place) are dropped. An error row, e.g. a page that no longer
-    exists, records nothing: marking those days 0 would be wrong."""
+    exists, records nothing: marking those days 0 would be wrong.
+
+    An empty result records nothing either. The scraper gives no sign it
+    reached the page (on 2026-10-02 it returned nothing, without an error,
+    for two busy sites), and weeks without a single post at a site people
+    visit every day aren't believable. Those days stay missing."""
+    if items.empty:
+        print(f"::warning::{node_key}: the scraper returned nothing for location {location_id}, without an "
+              "error; nothing recorded (missing, not 0). Check the run in the Apify console.")
+        return
     if "error" in items and items["error"].notna().any() and ("id" not in items or items["id"].isna().all()):
         print(f"::warning::{node_key}: Apify returned an error for location {location_id}: "
               f"{items['error'].dropna().iloc[0]}; nothing recorded. Check instagram.location_id "

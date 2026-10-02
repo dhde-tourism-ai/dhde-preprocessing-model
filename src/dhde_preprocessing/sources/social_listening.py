@@ -49,7 +49,7 @@ import pandas as pd
 
 from ..config import read_csv_if_exists, resolve_live_path, write_csv
 from ..validation import SourceReport, unavailable_report, validate_daily
-from ..sentiment import lang_group
+from ..sentiment import label_of, lang_group
 from .instagram import round_to
 
 LOG_DIR = "social"
@@ -202,6 +202,7 @@ def to_daily(log: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
         keep |= (items["platform"] == p) & items["date"].isin(d)
     items = items[keep]
     items["sentiment"] = pd.to_numeric(items["sentiment"], errors="coerce")
+    items["label"] = items["sentiment"].map(label_of)  # from the score: logs from before NEUTRAL_BAND too
     items["likes"] = pd.to_numeric(items["likes"], errors="coerce")
     items["lang"] = items["language"].map(lambda x: lang_group(x) if isinstance(x, str) else "other")
 
