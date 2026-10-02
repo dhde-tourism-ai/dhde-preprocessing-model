@@ -278,8 +278,6 @@ c9cba4379fc7684a,youtube,comment,2026-09-28,ja,0.0,-0.5337,negative,native,2026-
 a691eed218e11080,youtube,comment,2026-09-28,ja,0.0,0.3821,positive,native,2026-10-02T01:26:02Z
 1400bbc610d2e49c,youtube,comment,2026-09-28,ja,0.0,0.8462,positive,native,2026-10-02T01:26:02Z
 6ca2fd09f620d0b5,youtube,comment,2026-09-28,ja,0.0,-0.253,negative,native,2026-10-02T01:26:02Z
-056833d511189fb1,youtube,post,2026-09-29,ja,0.0,0.7719,positive,native,2026-10-02T01:26:02Z
-0f6fe164b847e55e,youtube,post,2026-09-29,ja,0.0,0.3599,positive,native,2026-10-02T01:26:02Z
 c3cfcae0e9b4c177,youtube,comment,2026-09-29,ja,0.0,-0.3094,negative,native,2026-10-02T01:26:02Z
 a5332c69109ec8eb,youtube,comment,2026-09-29,ja,0.0,-0.179,neutral,native,2026-10-02T01:26:02Z
 743312407e79d136,youtube,comment,2026-09-29,ja,0.0,0.3023,positive,native,2026-10-02T01:26:02Z
@@ -290,13 +288,14 @@ c773fb84ba71bd82,youtube,comment,2026-09-29,ja,0.0,0.3243,positive,native,2026-1
 023ba66437209c4e,youtube,comment,2026-09-29,ja,0.0,0.1226,neutral,native,2026-10-02T01:26:02Z
 26f8918a22be690a,youtube,comment,2026-09-29,ja,0.0,0.04,neutral,native,2026-10-02T01:26:02Z
 c523b65b317dde55,youtube,comment,2026-09-29,ja,0.0,-0.2734,negative,native,2026-10-02T01:26:02Z
+056833d511189fb1,youtube,post,2026-09-29,ja,0.0,0.7719,positive,native,2026-10-02T02:30:39Z
+0f6fe164b847e55e,youtube,post,2026-09-29,ja,0.0,0.3599,positive,native,2026-10-02T02:30:39Z
 fbe2843ad4e863ba,youtube,comment,2026-09-30,ja,0.0,0.5613,positive,native,2026-10-02T01:26:02Z
 c629f73eb629e2b9,youtube,comment,2026-09-30,ja,0.0,-0.1913,neutral,native,2026-10-02T01:26:02Z
 2dadca24a16fd6dd,youtube,comment,2026-09-30,ja,0.0,0.1252,neutral,native,2026-10-02T01:26:02Z
 479e7dcb2a2ec871,youtube,comment,2026-09-30,ja,0.0,-0.3141,negative,native,2026-10-02T01:26:02Z
 20a664f07c3f3d0d,youtube,comment,2026-09-30,ja,0.0,-0.057,neutral,native,2026-10-02T01:26:02Z
 e844c6d76fca7572,youtube,comment,2026-09-30,ja,0.0,0.3389,positive,native,2026-10-02T01:26:02Z
-1f5f55137cab59b5,youtube,post,2026-10-01,ja,10.0,0.7496,positive,native,2026-10-02T01:26:02Z
 a8639abf97265815,youtube,comment,2026-10-01,ja,0.0,0.5226,positive,native,2026-10-02T01:26:02Z
 fc61cc7511ed1f0e,youtube,comment,2026-10-01,ja,0.0,-0.219,negative,native,2026-10-02T01:26:02Z
 59ea14bf57d74fcf,youtube,comment,2026-10-01,ja,0.0,0.6236,positive,native,2026-10-02T01:26:02Z
@@ -310,4 +309,5 @@ fddc1af1027e3a95,youtube,comment,2026-10-01,ja,0.0,-0.114,neutral,native,2026-10
 c81dd06280d1dc96,youtube,comment,2026-10-01,ja,0.0,-0.4182,negative,native,2026-10-02T01:26:02Z
 d301aba404f6a46d,youtube,comment,2026-10-01,ja,0.0,0.7655,positive,native,2026-10-02T01:26:02Z
 c9d3da20792cf843,youtube,comment,2026-10-01,ja,0.0,0.8522,positive,native,2026-10-02T01:26:02Z
-23696704b9d506d3,youtube,post,2026-10-02,en,0.0,0.6768,positive,native,2026-10-02T01:26:02Z
+1f5f55137cab59b5,youtube,post,2026-10-01,ja,10.0,0.7496,positive,native,2026-10-02T02:30:39Z
+23696704b9d506d3,youtube,post,2026-10-02,en,0.0,0.6768,positive,native,2026-10-02T02:30:39Z
