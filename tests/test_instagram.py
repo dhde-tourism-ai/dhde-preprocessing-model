@@ -17,7 +17,14 @@ def _items(rows: list[dict]) -> pd.DataFrame:
 
 @pytest.mark.parametrize("caption,script", [
     ("東尋坊きれいだった #fukui #tojinbo", "ja"),
-    ("永平寺", "zh"),            # Chinese characters only: no kana, so not counted as Japanese
+    # Kanji only is Japanese unless a character or word only Chinese uses says otherwise (review of #25).
+    ("大本山永平寺参拝", "ja"),
+    ("恐竜博物館最高", "ja"),
+    ("福井県立恐竜博物館 #恐竜", "ja"),
+    ("勝山 恐竜 / 福井旅行 2026", "ja"),
+    ("东寻坊太美了", "zh"),        # Simplified-only 东 寻
+    ("東尋坊風景很美", "zh"),      # 很 is Chinese-only
+    ("臺灣人來福井", "zh"),        # Traditional-only 臺 灣 來
     ("후쿠이 여행 Fukui trip", "ko"),
     ("Amazing cliffs! #japan #東尋坊", "latin"),  # tags don't count
     ("#東尋坊 🌊", "none"),
@@ -56,18 +63,18 @@ def test_append_dedupes_and_keeps_the_latest_counts(live_root):
     first = ig.normalize(_items([{"id": "1", "timestamp": "2026-09-28T01:00:00Z", "likesCount": 5}]), "123")
     run = ig.run_summary(first, "123", "2026-09-30", 200, "2026-09-27")
     assert ig.append("tojinbo", first, run) == (1, 1)
-    again = ig.normalize(_items([{"id": "1", "timestamp": "2026-09-28T01:00:00Z", "likesCount": 9}]), "123")
+    again = ig.normalize(_items([{"id": "1", "timestamp": "2026-09-28T01:00:00Z", "likesCount": 38}]), "123")
     assert ig.append("tojinbo", again, run) == (0, 1)
     log = pd.read_csv(ig.post_log_path("tojinbo"))
-    assert log["likes"].tolist() == [9]
+    assert log["likes"].tolist() == [40]  # the latest count, rounded to 10
     assert ig.since_date("tojinbo") == "2026-09-27"  # covered_to 09-29, minus 2 days
 
 
 def test_to_daily_counts_and_zero_on_covered_days_without_posts():
     posts = ig.normalize(_items([
-        {"id": "1", "timestamp": "2026-09-28T01:00:00Z", "type": "Image", "caption": "きれい", "likesCount": 5},
+        {"id": "1", "timestamp": "2026-09-28T01:00:00Z", "type": "Image", "caption": "きれい", "likesCount": 47},
         {"id": "2", "timestamp": "2026-09-28T02:00:00Z", "type": "Video", "caption": "wow", "likesCount": -1,
-         "commentsCount": 3},
+         "commentsCount": 9},
         {"id": "3", "timestamp": "2026-09-01T02:00:00Z"},  # outside coverage
     ]), "123")
     runs = pd.DataFrame([{"run_date": "2026-09-30", "location_id": "123", "fetched": 3, "capped": False,
@@ -76,7 +83,7 @@ def test_to_daily_counts_and_zero_on_covered_days_without_posts():
     assert daily.index.strftime("%Y-%m-%d").tolist() == ["2026-09-27", "2026-09-28", "2026-09-29"]
     day = daily.loc["2026-09-28"]
     assert (day["instagram_posts"], day["instagram_photos"], day["instagram_videos"]) == (2, 1, 1)
-    assert day["instagram_likes"] == 5 and day["instagram_comments"] == 4
+    assert day["instagram_likes"] == 50 and day["instagram_comments"] == 10  # 47 to 50; comments 1 to 0, 9 to 10
     assert day["instagram_script_ja"] == 1 and day["instagram_script_latin"] == 1
     assert daily.loc["2026-09-27", "instagram_posts"] == 0
 
@@ -109,3 +116,9 @@ def test_the_log_keeps_the_day_not_the_time(live_root):
     ig.append("tojinbo", posts, ig.run_summary(posts, "123", "2026-09-30", 200, "2026-09-27"))
     text = open(ig.post_log_path("tojinbo"), encoding="utf-8").read()
     assert "01:23" not in text and "2026-09-28" in text
+
+
+def test_counts_are_rounded_so_a_post_cant_be_picked_out():
+    posts = ig.normalize(_items([{"id": "1", "timestamp": "2026-09-28T01:00:00Z", "likesCount": 1234,
+                                  "commentsCount": 17}]), "123")
+    assert (posts["likes"].iloc[0], posts["comments"].iloc[0]) == (1230, 15)
