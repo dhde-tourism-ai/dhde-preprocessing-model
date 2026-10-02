@@ -19,6 +19,12 @@ sources:
       (checked 2026-09-27). Do not fabricate one — this gap stays visible
       in the coverage report as "unavailable."
 
+  jma_warning:
+    # JMA warnings in force (sources/weather_warnings.py): office and municipality
+    # (class20) codes from bosai/common/const/area.json.
+    office: "180000"  # 福井県
+    areas: ["1832200"]  # 永平寺町
+
   weather:
     enabled: true
     # Closest station is 美山 (Miyama, 57071, ~6.5km), but it records
