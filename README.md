@@ -192,6 +192,21 @@ Reviews with text are also counted per language (`reviews_lang_ja`, `_en`,
 Traditional Chinese points to Taiwan or Hong Kong and Simplified to
 mainland China: a proxy for the visitor's market, not their nationality.
 
+**Social media mentions** too: `scripts/collect_social.py` runs Anugra's
+[social-collector](https://github.com/anugraaa-rizky/social-media-scraping)
+weekly (`.github/workflows/collect-social.yml`) on Bluesky, YouTube and
+Reddit with each node's `social_listening.keywords`, and appends to
+`social/` on `live-data`. Every post and comment gets its language
+(Japanese, Korean, Arabic, Traditional and Simplified Chinese, English and
+more) and a sentiment score from a free multilingual model, translating to
+English first where the model doesn't know the language
+(`src/dhde_preprocessing/sentiment.py`). Only counts, language and scores
+are kept, never text. Needs `pip install -r requirements-social.txt` and
+the `YOUTUBE_API_KEY` and `REDDIT_*` secrets (a platform without its keys
+is skipped; Bluesky needs none). Instagram captions are scored the same
+way before they're dropped. To check the model by hand, `--sample-out
+FILE` writes a local sample with text; keep it off the repo.
+
 ## Non-obvious things found while building this — read before extending
 
 - **`config.resolve_path`** is the only way any source module touches the

@@ -11,6 +11,8 @@ from dhde_preprocessing import lang
     ("zh-Hans", "臺灣人來福井", "zh-Hant"),     # one-sided markers beat the detector's guess
     ("zh-Hant", "東尋坊風景很美", "zh-Hant"),   # 很: Chinese, script left to the detector
     ("ja", "东寻坊", "ja"),                     # only a Chinese answer is second-guessed
+    ("zh", "東尋坊好美", "zh"),                 # Taiwanese tourist words (review of #25)
+    ("zh", "福井恐龍博物館超讚", "zh-Hant"),
     ("ko", "도진보", "ko"),
     (None, "永平寺", None),
 ])

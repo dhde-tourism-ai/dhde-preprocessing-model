@@ -82,6 +82,7 @@ SOURCE_PREFIX = {
     "visitor_reservation": "attraction_",
     "google_reviews": "reviews_",
     "instagram": "instagram_",
+    "social_listening": "social_",
 }
 FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope", "weather_station"]
 
@@ -92,7 +93,7 @@ FRONT_COLUMNS = ["date", "node_key", "day_of_week", "is_holiday", "hotel_scope",
 # with no data at all is a warning in the report, not a missing column.
 EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "has_camera", "has_footfall_proxy", "has_google_reviews", "has_hotel", "has_instagram", "has_monthly_visitors", "has_rakuten",
-    "has_road_congestion", "has_rsi", "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
+    "has_road_congestion", "has_rsi", "has_social_listening", "has_survey", "has_traffic", "has_visitor_reservation", "has_weather",
     "camera_count", "camera_gate1_vehicle_count", "camera_gate2_vehicle_count",
     "weather_precip", "weather_temp", "weather_wind", "weather_sun", "weather_humidity", "weather_snow_depth",
     "rsi_level", "rsi_map_views", "rsi_search_views", "rsi_directions", "rsi_call_clicks", "rsi_website_clicks",
@@ -119,6 +120,12 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "reviews_rating_total", "reviews_count_total",
     "instagram_posts", "instagram_photos", "instagram_videos", "instagram_likes", "instagram_comments",
     *[f"instagram_script_{s}" for s in ("ja", "ko", "zh", "latin", "none")],
+    "instagram_scored", "instagram_positive", "instagram_neutral", "instagram_negative", "instagram_sentiment_mean",
+    "social_mentions", "social_posts", "social_comments", "social_likes",
+    *[f"social_{p}_mentions" for p in ("bluesky", "youtube", "reddit")],
+    "social_positive", "social_neutral", "social_negative", "social_scored", "social_translated",
+    *[f"social_lang_{g}" for g in ("ja", "en", "zh_hant", "zh_hans", "ko", "ar", "other")],
+    "social_sentiment_mean", "social_platforms",
 ]
 
 SURVEY_COUNT = "survey_response_count"

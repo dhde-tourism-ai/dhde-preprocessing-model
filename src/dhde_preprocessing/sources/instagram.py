@@ -16,7 +16,9 @@ like the Google reviews; it can also import an export someone ran by hand.
 What's kept: this repo and the `live-data` branch are public, so the log
 holds no usernames, captions, links or images. Only a hash of the post
 id (to drop duplicates between runs), the day, the kind, the like and
-comment counts at scrape time and the caption's script. The day, not the
+comment counts at scrape time, the caption's script, and its sentiment
+score and label (sentiment.py), worked out while the caption is in
+memory. Logs from before sentiment have those empty. The day, not the
 time: a post's exact time and location find it on Instagram, and with it
 the account that posted it. Likes are rounded to the nearest 10 and
 comments to the nearest 5 for the same reason: at a quiet location, the
@@ -58,7 +60,8 @@ from ..lang import chinese_variant
 from ..validation import SourceReport, unavailable_report, validate_daily
 
 LOG_DIR = "instagram"
-POST_COLS = ["post_hash", "location_id", "date", "kind", "likes", "comments", "script", "scraped_at"]
+POST_COLS = ["post_hash", "location_id", "date", "kind", "likes", "comments", "script", "sentiment",
+             "label", "scraped_at"]
 RUN_COLS = ["run_date", "location_id", "fetched", "capped", "covered_from", "covered_to"]
 JST = timezone(timedelta(hours=9))
 # Apify's type -> ours. Sidecar is a carousel of several images or videos.
@@ -112,12 +115,16 @@ def round_to(values: pd.Series, step: int) -> pd.Series:
     return (values / step).round() * step
 
 
-def normalize(items: pd.DataFrame, location_id: str) -> pd.DataFrame:
-    """Scraper output (export or API items) -> POST_COLS, personal fields dropped."""
+def normalize(items: pd.DataFrame, location_id: str, scorer=None) -> pd.DataFrame:
+    """Scraper output (export or API items) -> POST_COLS, personal fields dropped.
+
+    With a sentiment.Scorer, each caption is scored before it's dropped."""
     if items.empty or "id" not in items:
         return pd.DataFrame(columns=POST_COLS)
     items = items[items["id"].notna() & items.get("timestamp", pd.Series(index=items.index)).notna()]
     likes = pd.to_numeric(items.get("likesCount"), errors="coerce")
+    captions = items.get("caption", pd.Series(index=items.index, dtype=object))
+    scores = scorer([c if isinstance(c, str) else None for c in captions]) if scorer else [None] * len(items)
     out = pd.DataFrame({
         "post_hash": items["id"].map(_hash),
         "location_id": str(location_id),
@@ -126,7 +133,9 @@ def normalize(items: pd.DataFrame, location_id: str) -> pd.DataFrame:
         # Instagram reports -1 when the owner hides the like count.
         "likes": round_to(likes.where(likes >= 0), 10),
         "comments": round_to(pd.to_numeric(items.get("commentsCount"), errors="coerce"), 5),
-        "script": items.get("caption", pd.Series(index=items.index, dtype=object)).map(caption_script),
+        "script": captions.map(caption_script),
+        "sentiment": [r.score if r else None for r in scores],
+        "label": [r.label if r else None for r in scores],
         "scraped_at": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ"),
     })
     return out.dropna(subset=["date"])
@@ -170,7 +179,7 @@ def append(node_key: str, posts: pd.DataFrame, run: dict) -> tuple[int, int]:
     parts = [df for df in (old, posts) if df is not None and not df.empty]
     log = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=POST_COLS)
     log = log.drop_duplicates("post_hash", keep="last").sort_values("date", kind="stable")
-    write_csv(log[POST_COLS], path)
+    write_csv(log.reindex(columns=POST_COLS), path)
 
     runs_path = run_log_path(node_key)
     runs = read_csv_if_exists(runs_path, dtype={"location_id": str})
@@ -201,14 +210,16 @@ def to_daily(posts: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
 
     instagram_posts, _photos (photos and carousels), _videos, _likes,
     _comments, and instagram_script_{ja,ko,zh,latin,none} splitting
-    instagram_posts. All 0 on a covered day without posts. Likes skip
+    instagram_posts. instagram_positive / _neutral / _negative, _scored
+    and instagram_sentiment_mean (missing on a day with no scored
+    caption). Counts are 0 on a covered day without posts. Likes skip
     posts with hidden counts.
     """
     days = covered_days(runs)
-    p = posts.copy()
+    p = posts.reindex(columns=POST_COLS).copy()
     p["date"] = pd.to_datetime(p["date"])
     p = p[p["date"].isin(days)]
-    for col in ("likes", "comments"):
+    for col in ("likes", "comments", "sentiment"):
         p[col] = pd.to_numeric(p[col], errors="coerce")
     g = p.groupby("date")
     daily = pd.DataFrame({
@@ -218,9 +229,14 @@ def to_daily(posts: pd.DataFrame, runs: pd.DataFrame) -> pd.DataFrame:
         "instagram_likes": g["likes"].sum(),
         "instagram_comments": g["comments"].sum(),
         **{f"instagram_script_{s}": g["script"].apply(lambda x, s=s: int((x == s).sum())) for s in SCRIPTS},
+        "instagram_scored": g["sentiment"].count(),
+        **{f"instagram_{lab}": g["label"].apply(lambda x, lab=lab: int((x == lab).sum()))
+           for lab in ("positive", "neutral", "negative")},
     }).reindex(days)
     # An empty log groups to object columns; make them numeric before filling.
-    return daily.apply(pd.to_numeric).fillna(0).astype(int).rename_axis("date").reset_index()
+    daily = daily.apply(pd.to_numeric).fillna(0).astype(int)
+    daily["instagram_sentiment_mean"] = g["sentiment"].mean().reindex(days).round(4)
+    return daily.rename_axis("date").reset_index()
 
 
 def load_instagram(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
