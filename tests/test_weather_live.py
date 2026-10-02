@@ -19,7 +19,7 @@ class _Resp:
 
 def _hourly(times, precip, temp=15.0):
     n = len(times)
-    return {"hourly": {"time": times, "temperature_2m": [temp] * n, "precipitation": precip,
+    return {"latitude": 36.2, "longitude": 136.1, "hourly": {"time": times, "temperature_2m": [temp] * n, "precipitation": precip,
                        "wind_speed_10m": [3.0] * n, "relative_humidity_2m": [70] * n, "weather_code": [61] * n}}
 
 
@@ -28,6 +28,7 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(wl, "resolve_live_path", lambda p: str(tmp_path / "live" / p))
     monkeypatch.setattr(wl, "resolve_path", lambda p: str(tmp_path / "ws" / p))
     monkeypatch.setattr(wl, "FETCH_PAUSE_S", 0)
+    monkeypatch.setattr(wl, "RETRY_PAUSE_S", 0)
     return tmp_path
 
 
@@ -171,3 +172,49 @@ def test_history_joins_the_jma_cache_and_the_collector_file(env, monkeypatch):
     assert list(hist["timestamp"].dt.strftime("%m-%d %H")) == ["09-30 23", "10-01 00", "10-01 13"]
     # The cache's observation for 00:00 beats the collector's forecast for it.
     assert list(hist["source"]) == ["observed", "observed", "forecast"] and hist["precip_1h_mm"].iloc[1] == 0.0
+
+
+def test_one_request_serves_every_node(env, monkeypatch):
+    a, b = _cfg(weather=False), {**_cfg(weather=False), "node_key": "m", "coordinates": {"lat": 35.6, "lon": 135.9}}
+    calls = _serve(monkeypatch, [{**_hourly(["2026-10-01 12:00"], [1.0]), "latitude": 36.2, "longitude": 136.1},
+                                 {**_hourly(["2026-10-01 12:00"], [9.0]), "latitude": 35.6, "longitude": 135.9}])
+    fc = wl.fetch_forecasts([a, b, {"node_key": "x", "sources": {}}], now=NOW)
+    assert len(calls) == 1 and calls[0]["latitude"] == "36.2,35.6" and calls[0]["longitude"] == "136.1,135.9"
+    assert fc["n"]["precip_1h_mm"].iloc[0] == 1.0 and fc["m"]["precip_1h_mm"].iloc[0] == 9.0 and "x" not in fc
+    calls.clear()
+    df, _ = wl.collect(b, now=NOW, forecasts=fc)
+    assert calls == [] and df["precip_1h_mm"].iloc[0] == 9.0
+
+
+def test_a_timed_out_forecast_is_retried(env, monkeypatch):
+    answers = [requests.ReadTimeout(), requests.ReadTimeout(), _Resp(_hourly(["2026-10-01 12:00"], [2.0]))]
+    _serve(monkeypatch, None)
+
+    def _get(url, params, timeout):
+        r = answers.pop(0)
+        if isinstance(r, Exception):
+            raise r
+        return r
+    monkeypatch.setattr(wl.requests, "get", _get)
+    df, report = wl.collect(_cfg(weather=False), now=NOW)
+    assert df["precip_1h_mm"].iloc[0] == 2.0 and not any("failed" in n for n in report.notes)
+
+
+def test_a_failed_batch_keeps_the_saved_forecast_without_asking_per_node(env, monkeypatch):
+    _serve(monkeypatch, _hourly(["2026-10-02 09:00"], [1.0]))
+    wl.collect(_cfg(weather=False), now=NOW)
+    calls = _serve(monkeypatch, [_hourly(["2026-10-01 12:00"], [1.0])])  # 1 point back for 2 asked
+    two = [_cfg(weather=False), {**_cfg(weather=False), "node_key": "m"}]
+    assert wl.fetch_forecasts(two, now=NOW) == {}
+    calls.clear()
+    df, report = wl.collect(two[0], now=NOW, forecasts={})
+    assert calls == [] and df["precip_1h_mm"].iloc[0] == 1.0
+    assert any("forecast failed (not in this run's one-request forecast)" in n for n in report.notes)
+
+
+def test_a_point_that_isnt_the_nodes_fails_the_batch(env, monkeypatch):
+    a, b = _cfg(weather=False), {**_cfg(weather=False), "node_key": "m", "coordinates": {"lat": 35.6, "lon": 135.9}}
+    swapped = [{**_hourly(["2026-10-01 12:00"], [9.0]), "latitude": 35.6, "longitude": 135.9},
+               {**_hourly(["2026-10-01 12:00"], [1.0]), "latitude": 36.2, "longitude": 136.1}]
+    _serve(monkeypatch, swapped)
+    assert wl.fetch_forecasts([a, b], now=NOW) == {}

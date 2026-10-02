@@ -21,6 +21,8 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    # A normal run takes ~10 min; a stuck source mustn't hold the shared queue for long.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
