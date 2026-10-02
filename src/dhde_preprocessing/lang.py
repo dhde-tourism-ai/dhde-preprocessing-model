@@ -21,11 +21,12 @@ from __future__ import annotations
 import re
 
 # Simplified forms that aren't Japanese (Japanese has 東 龍 館 這 for these).
-SIMPLIFIED_ONLY = set("们这说对吗还东龙馆门车时间觉问见边进么爱买卖钱线经应该让从华乐头发现实欢岛览观园汤鱼鸟红绿风飞寻个过荐")
+SIMPLIFIED_ONLY = set("们这说对吗还东龙馆门车时间觉问见边进么爱买卖钱线经应该让从华乐头发现实欢岛览观园汤鱼鸟红绿风飞寻个过荐赞")
 # Traditional forms Japanese replaced (Japanese writes 台 湾 国 楽 来 会 for these).
-TRADITIONAL_ONLY = set("們這說對嗎還臺灣觀國樂歡實體點會來邊麼覺寶舊處聽畫賣錢經區應讓從發覽綠")
-# Chinese words or particles, either script, that Japanese doesn't use.
-CHINESE_WORDS = ("很", "呢", "吧", "啊", "哦", "喔", "旅游", "旅遊", "好玩", "景点", "景點", "打卡", "必去")
+TRADITIONAL_ONLY = set("們這說對嗎還臺灣觀國樂歡實體點會來邊麼覺寶舊處聽畫賣錢經區應讓從發覽綠讚")
+# Chinese words or particles, either script, that Japanese doesn't use. 好美 is also a
+# Japanese given name (Yoshimi), rare in place posts; Taiwanese captions use it a lot.
+CHINESE_WORDS = ("很", "呢", "吧", "啊", "哦", "喔", "旅游", "旅遊", "好玩", "景点", "景點", "打卡", "必去", "好美")
 
 _KANA = re.compile(r"[぀-ヿㇰ-ㇿｦ-ﾟ]")
 _HAN = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
