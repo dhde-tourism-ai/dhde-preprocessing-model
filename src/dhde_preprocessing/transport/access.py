@@ -274,7 +274,7 @@ def route_lines(feeds: list, net: Network, route_ids: set[str]) -> list[dict]:
 def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, cache_dir: Path = CACHE,
           config: Path = CONFIG, walk_areas: Path = WALK_AREAS) -> None:
     """Write transport.json and transport_map.json to out_dir."""
-    cfg = json.loads(Path(config).read_text())
+    cfg = json.loads(Path(config).read_text(encoding="utf-8"))
     walk = cfg["walk"]
     days = reference_days(start or datetime.now(JST).date())
 
@@ -359,13 +359,13 @@ def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, ca
         "nodes": nodes_out,
     }
     walk_file = Path(walk_areas)
-    areas = json.loads(walk_file.read_text()) if walk_file.exists() else None
+    areas = json.loads(walk_file.read_text(encoding="utf-8")) if walk_file.exists() else None
     tmap = meta | {"lines": lines, "stops": sorted(map_stops.values(), key=lambda s: s["id"]),
                    "walk_areas": areas}
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "transport.json").write_text(json.dumps(transport, ensure_ascii=False, indent=1) + "\n")
-    (out / "transport_map.json").write_text(json.dumps(tmap, ensure_ascii=False, separators=(",", ":")) + "\n")
+    (out / "transport.json").write_text(json.dumps(transport, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    (out / "transport_map.json").write_text(json.dumps(tmap, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"[OK] wrote {out / 'transport.json'} and transport_map.json ({len(lines)} lines, {len(map_stops)} stops)")
     for k, n in nodes_out.items():
         wk = n["days"]["weekday"]

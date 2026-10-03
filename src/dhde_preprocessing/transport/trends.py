@@ -22,7 +22,7 @@ CONFIG = Path(__file__).resolve().parents[3] / "config" / "transport" / "config.
 
 def build(out: Path, *, config: Path = CONFIG) -> bool:
     """Write transport_trends.json to out. False (nothing written) if Google refuses."""
-    cfg = json.loads(Path(config).read_text())["trends"]
+    cfg = json.loads(Path(config).read_text(encoding="utf-8"))["trends"]
     try:
         from pytrends.request import TrendReq
         p = TrendReq(hl="ja-JP", tz=-540, timeout=(10, 30))  # no retries=: pytrends passes method_whitelist, gone in urllib3 2
@@ -48,7 +48,7 @@ def build(out: Path, *, config: Path = CONFIG) -> bool:
     }
     path = Path(out)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(result, ensure_ascii=False, indent=1) + "\n")
+    path.write_text(json.dumps(result, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"[OK] wrote {path} ({len(result['weeks'])} weeks)")
     return True
 

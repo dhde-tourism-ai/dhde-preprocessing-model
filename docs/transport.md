@@ -8,6 +8,10 @@ Built **daily** by `scripts/build_transport.py`, which dhde-app's `daily-data.ym
 `real_data.json`. The outputs go to the app's `public/data/` (committed and synced to the serving bucket with the rest)
 and to `curated/<day>/transport/` in the data bucket.
 
+**Order matters:** the script reads the app's `real_data.json` (`--real-data`) for the visitor estimates, so dhde-app
+must build `real_data.json` before calling it (as `daily-data.yml` does). With an old file, tourists by mode uses old
+visitor numbers.
+
 | Output | Built by | Shown in the app |
 |---|---|---|
 | `transport.json` | `transport/access.py` (bus timetables, downloaded fresh each run) | Transport page; "Getting here" card in the node drawer |

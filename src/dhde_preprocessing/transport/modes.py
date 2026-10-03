@@ -143,7 +143,7 @@ def build(survey_dir: Path | None, real_data: Path, out: Path, *, config: Path =
         print(f"[SKIP] survey not found at {survey_dir}; transport_modes.json not built")
         return False
 
-    cfg = json.loads(Path(config).read_text())["mode_share"]
+    cfg = json.loads(Path(config).read_text(encoding="utf-8"))["mode_share"]
     sd = Path(survey_dir)
     survey = pd.read_csv(sd / "all.csv", dtype=str, usecols=["回答日時", "回答エリア", MODES_COL, "交通費", "都道府県"])
     area = pd.read_csv(sd / "area.csv", dtype=str)
@@ -153,7 +153,7 @@ def build(survey_dir: Path | None, real_data: Path, out: Path, *, config: Path =
     first = last - timedelta(days=365) + timedelta(days=1)
     survey = survey[survey["回答日時"] >= first.isoformat()]
 
-    real = json.loads(Path(real_data).read_text()) if Path(real_data).exists() else {"nodes": {}}
+    real = json.loads(Path(real_data).read_text(encoding="utf-8")) if Path(real_data).exists() else {"nodes": {}}
     nodes_out, tot30, totyr = {}, {m: [0, 0, 0] for m in MODES}, {m: [0, 0, 0] for m in MODES}
     v30_total = vyr_total = 0
     period30 = None
@@ -220,7 +220,7 @@ def build(survey_dir: Path | None, real_data: Path, out: Path, *, config: Path =
         "nodes": nodes_out,
     }
     Path(out).parent.mkdir(parents=True, exist_ok=True)
-    Path(out).write_text(json.dumps(result, ensure_ascii=False, indent=1) + "\n")
+    Path(out).write_text(json.dumps(result, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     t = result["totals"]["last_30_days"]
     print(f"[OK] wrote {out}: last 30 days {t['visitors']:,} visitors -> "
           + ", ".join(f"{m} {v['visitors']:,}" for m, v in t["by_mode"].items()))

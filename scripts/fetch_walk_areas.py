@@ -41,7 +41,7 @@ def isochrone(lat: float, lon: float) -> dict[str, list[list[float]]]:
 
 
 def main() -> None:
-    cfg = json.loads((HERE / "config.json").read_text())
+    cfg = json.loads((HERE / "config.json").read_text(encoding="utf-8"))
     areas = {}
     for k, nc in cfg["nodes"].items():
         a = nc["anchor"]
@@ -51,7 +51,7 @@ def main() -> None:
     out = {"generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
            "source": "Valhalla pedestrian isochrones (valhalla1.openstreetmap.de), OpenStreetMap data (ODbL)",
            "licence": "ODbL 1.0, © OpenStreetMap contributors", "minutes": MINUTES, "nodes": areas}
-    (HERE / "walk_areas.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n")
+    (HERE / "walk_areas.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"[OK] wrote {HERE / 'walk_areas.json'}")
 
 
