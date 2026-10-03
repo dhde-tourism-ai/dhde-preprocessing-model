@@ -1,0 +1,270 @@
+{
+  "note": "Transport track config for scripts/build_transport.py: timetable feeds, each site's access point (anchor: the visitor destination itself, e.g. the Dinosaur Museum for Katsuyama) and catchment radius_m (straight line, for 'stops serving this site'), long-distance assumptions, Google Trends terms, survey areas for mode share and fare overrides. Site ids match the app's nodes.json.",
+  "hub": "fukui_station",
+  "walk": {
+    "speed_m_per_min": 80,
+    "detour_factor": 1.3,
+    "transfer_radius_m": 300,
+    "transfer_buffer_min": 3
+  },
+  "feeds": [
+    {
+      "id": "keifuku_bus",
+      "name": "Keifuku Bus (routes)",
+      "name_ja": "京福バス（路線バス）",
+      "mode": "bus",
+      "url": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp_d/fil/keifuku_bus.zip",
+      "page": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp.html",
+      "licence": "CC BY 4.0 (Fukui Prefecture open data; ODPT catalogue lists 京福バス株式会社 as author)",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "caveat": "CC BY 4.0: credit \"京福バス株式会社 / Fukui Prefecture open data\". The permission line in the feed comes from the GTFS authoring tool (その筋屋), not from Keifuku; the official listings carry no such condition. Confirmed 3 Oct 2026.",
+      "caveat_ja": "CC BY 4.0：「京福バス株式会社／福井県オープンデータ」を表示。フィード内の許諾の記載はGTFS作成ツール（その筋屋）のもので、京福バスの条件ではない（県・ODPTの公式掲載に条件なし）。2026年10月3日確認。",
+      "publish_status": "ok"
+    },
+    {
+      "id": "fukutetsu_bus",
+      "name": "Fukutetsu Bus (routes)",
+      "name_ja": "福鉄バス（路線バス）",
+      "mode": "bus",
+      "url": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp_d/fil/gtfs_fukutetu.zip",
+      "page": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp.html",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "publish_status": "ok"
+    },
+    {
+      "id": "katsuyama_city_bus",
+      "name": "Katsuyama City community bus",
+      "name_ja": "勝山市コミュニティバス",
+      "mode": "bus",
+      "url": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp_d/fil/gtfs_katsuyamashi.zip",
+      "page": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp.html",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "publish_status": "ok"
+    },
+    {
+      "id": "eiheiji_town_bus",
+      "name": "Eiheiji Town community bus",
+      "name_ja": "永平寺町コミュニティバス",
+      "mode": "bus",
+      "url": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp_d/fil/eiheiji_bus.zip",
+      "page": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp.html",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "publish_status": "ok"
+    },
+    {
+      "id": "sakai_city_bus",
+      "name": "Sakai City community bus",
+      "name_ja": "坂井市コミュニティバス",
+      "mode": "bus",
+      "url": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp_d/fil/sakaisi_bus.zip",
+      "page": "https://www.pref.fukui.lg.jp/doc/dx-suishin/opendata/gtfs_jp.html",
+      "licence": "CC BY 4.0",
+      "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+      "publish_status": "ok"
+    },
+    {
+      "id": "fukutetsu_echitetsu_rail",
+      "name": "Fukui Railway + Echizen Railway (research GTFS)",
+      "name_ja": "福井鉄道・えちぜん鉄道（研究用GTFS）",
+      "mode": "rail",
+      "url": "https://gtfs-gis.jp/gtfs4research/gtfs-fukutetsu-echitetsu20241001.zip",
+      "page": "https://gtfs-gis.jp/gtfs4research/",
+      "licence": "Research and survey use only (調査・研究目的に限る); not official, not operator-approved",
+      "licence_url": "https://gtfs-gis.jp/gtfs4research/",
+      "caveat": "Built by the University of Tokyo (Ito lab) from the October 2024 timetable; valid to 14 March 2025, so times can be out of date. Research use only: the published dashboard needs the operators' own data or their approval.",
+      "caveat_ja": "東京大学伊藤研究室が2024年10月ダイヤから作成した研究用データ（有効期限2025年3月14日）。時刻が古い可能性がある。調査・研究目的に限るため、公開ダッシュボードには事業者のデータか許諾が必要。",
+      "publish_status": "research_only"
+    }
+  ],
+  "nodes": {
+    "tojinbo": {
+      "radius_m": 800,
+      "anchor": {
+        "lat": 36.2376685,
+        "lon": 136.1265737,
+        "label": "Tojinbo",
+        "label_ja": "東尋坊"
+      }
+    },
+    "fukui_station": {
+      "radius_m": 400,
+      "anchor": {
+        "lat": 36.0614,
+        "lon": 136.2217,
+        "label": "Fukui Station East Entrance",
+        "label_ja": "福井駅東口"
+      }
+    },
+    "katsuyama": {
+      "radius_m": 800,
+      "anchor": {
+        "lat": 36.0837,
+        "lon": 136.5062,
+        "label": "Fukui Prefectural Dinosaur Museum",
+        "label_ja": "福井県立恐竜博物館"
+      },
+      "note": "Anchored on the Dinosaur Museum (the node's visitor signal is museum bookings). Echizen Railway to Katsuyama station is not counted: it has no open timetable.",
+      "note_ja": "恐竜博物館を基準点とする（この地点の来訪指標は博物館の予約）。えちぜん鉄道（勝山駅）はオープンな時刻表がないため含めていない。"
+    },
+    "rainbow_line": {
+      "radius_m": 800,
+      "anchor": {
+        "lat": 35.601189,
+        "lon": 135.8688963,
+        "label": "Rainbow Line",
+        "label_ja": "レインボーライン"
+      },
+      "note": "A toll road: the summit park is reached by car. JR Obama Line trains (Mikata, Kiyama) and the seasonal summit bus have no open timetable.",
+      "note_ja": "有料道路のため山頂公園へは車で。JR小浜線（三方・気山）と季節運行の山頂バスにはオープンな時刻表がない。"
+    },
+    "awara_onsen": {
+      "radius_m": 800,
+      "anchor": {
+        "lat": 36.2256037,
+        "lon": 136.1941521,
+        "label": "Awara Onsen",
+        "label_ja": "あわら温泉"
+      }
+    },
+    "eiheiji": {
+      "radius_m": 800,
+      "anchor": {
+        "lat": 36.0567754,
+        "lon": 136.3568759,
+        "label": "Eiheiji Temple",
+        "label_ja": "永平寺"
+      }
+    }
+  },
+  "long_distance": {
+    "kanazawa": {
+      "name": "Kanazawa",
+      "name_ja": "金沢",
+      "change_min": 5,
+      "basis": "Hokuriku Shinkansen, fastest scheduled trains (ekitan.com, Oct 2026): Kanazawa → Fukui 22-35 min, Kanazawa → Awara-Onsen 23-28 min. JR timetables are not open data, so the JR leg is a fixed estimate; then 5 min to change and the fastest local bus or train on the day's timetable.",
+      "gateways": [
+        {
+          "name": "Fukui Station",
+          "name_ja": "福井駅",
+          "node": "fukui_station",
+          "jr_min": 25
+        },
+        {
+          "name": "Awara-Onsen Station",
+          "name_ja": "芦原温泉駅",
+          "lat": 36.2156,
+          "lon": 136.2349,
+          "radius_m": 250,
+          "jr_min": 25
+        }
+      ]
+    },
+    "kyoto": {
+      "name": "Kyoto",
+      "name_ja": "京都",
+      "change_min": 5,
+      "basis": "Limited express Thunderbird to Tsuruga, change (8-15 min), Hokuriku Shinkansen on: Kyoto → Fukui about 1 h 28 min to 1 h 45 min (published journey guides), 90 min used; Awara-Onsen is one stop further (+10 min). JR timetables are not open data; then 5 min to change and the fastest local journey on the day's timetable.",
+      "gateways": [
+        {
+          "name": "Fukui Station",
+          "name_ja": "福井駅",
+          "node": "fukui_station",
+          "jr_min": 90
+        },
+        {
+          "name": "Awara-Onsen Station",
+          "name_ja": "芦原温泉駅",
+          "lat": 36.2156,
+          "lon": 136.2349,
+          "radius_m": 250,
+          "jr_min": 100
+        }
+      ]
+    }
+  },
+  "trends": {
+    "geo": "JP",
+    "timeframe": "today 12-m",
+    "terms": [
+      {
+        "term": "えちぜん鉄道",
+        "label": "Echizen Railway",
+        "mode": "rail"
+      },
+      {
+        "term": "京福バス",
+        "label": "Keifuku Bus",
+        "mode": "bus"
+      },
+      {
+        "term": "北陸新幹線 福井",
+        "label": "Hokuriku Shinkansen Fukui",
+        "mode": "rail"
+      },
+      {
+        "term": "レンタカー 福井",
+        "label": "Car rental Fukui",
+        "mode": "car"
+      },
+      {
+        "term": "レンタサイクル 福井",
+        "label": "Bike rental Fukui",
+        "mode": "bike"
+      }
+    ]
+  },
+  "mode_share": {
+    "note": "Survey area ids (fukui-kanko-survey area.csv 親番号) per site, the same as dhde-preprocessing-model config/nodes/*.yaml survey.area_ids.",
+    "nodes": {
+      "tojinbo": {
+        "area_ids": [
+          "300006"
+        ]
+      },
+      "fukui_station": {
+        "area_ids": [
+          "300004"
+        ],
+        "note": "No visitor estimate (camera detections only), so shares only.",
+        "note_ja": "来訪者数の推計がない（カメラ検知のみ）ため割合のみ。"
+      },
+      "katsuyama": {
+        "area_ids": [
+          "300019"
+        ]
+      },
+      "rainbow_line": {
+        "area_ids": [
+          "300059"
+        ]
+      },
+      "awara_onsen": {
+        "area_ids": [
+          "300011"
+        ],
+        "note": "Visitor estimate is overnight hotel guests, not day visitors.",
+        "note_ja": "来訪者数の推計は宿泊客で、日帰り客は含まない。"
+      },
+      "eiheiji": {
+        "area_ids": [
+          "300025"
+        ]
+      }
+    }
+  },
+  "fare_overrides": [
+    {
+      "feed": "keifuku_bus",
+      "route": "永平寺ライナー",
+      "yen": 1000,
+      "from": "2026-10-01",
+      "source": "https://bus.keifuku.co.jp/rosen-season/eiheiji-liner/",
+      "note": "Eiheiji Liner, Fukui Station East Exit to Eiheiji: ¥750 → ¥1,000 from 2026-10-01; the June 2026 GTFS still has ¥750. Applies to that stop pair only.",
+      "from_stop": "福井駅東口",
+      "to_stop": "永平寺"
+    }
+  ]
+}

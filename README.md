@@ -33,6 +33,8 @@ raw public data
   -> check_calibration.py   checks the conversion from measured counts to visitors
 
 forecast_monthly.py         12-month forecast (downloads its own data, runs on its own)
+build_transport.py          transport data: bus timetables, tourists by mode, search interest
+                            (runs after the app's real_data.json; see docs/transport.md)
 ```
 
 Three rules hold throughout:
@@ -54,6 +56,8 @@ python scripts/build_integrated.py           # 3. combine the six Fukui sites
 python scripts/build_forecast.py             # 4. 7-day forecast
 python scripts/check_calibration.py          # 5. (optional) check the visitor conversion
 python scripts/forecast_monthly.py           # 12-month forecast, independent of 2 to 5
+python scripts/build_transport.py --real-data ../dhde-app/public/data/real_data.json --refresh
+                                             # transport data (docs/transport.md)
 pytest                                       # run the tests
 ```
 
@@ -126,6 +130,7 @@ What each Fukui site measures:
 | [`docs/data_gaps.md`](docs/data_gaps.md) | What's missing per site, and what's used instead |
 | [`docs/site_capacity.md`](docs/site_capacity.md) | Official visitor counts, parking and other limits per site |
 | [`docs/osaka_kyoto_sources.md`](docs/osaka_kyoto_sources.md) | The suggested Osaka and Kyoto sources, and why most aren't usable |
+| [`docs/transport.md`](docs/transport.md) | Transport: bus timetables per site, tourists by mode (survey), search interest; built daily |
 | [Monthly forecast](#monthly-forecast) (below) | The 12-month forecast |
 
 ---
