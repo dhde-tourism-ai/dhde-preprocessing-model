@@ -15,10 +15,11 @@ visitor numbers.
 | Output | Built by | Shown in the app |
 |---|---|---|
 | `transport.json` | `transport/access.py` (bus timetables, downloaded fresh each run) | Transport page; "Getting here" card in the node drawer |
-| `transport_map.json` | `transport/access.py` + `config/transport/walk_areas.json` | Map → Movement → Public transport layer |
+| `transport_map.json` | `transport/access.py` + `config/transport/walk_areas.json` + `config/transport/rail_lines.json` | Map → Movement → **Bus routes** (routes, every stop, walking areas) and **Train routes** (railway lines and stations) |
 | `transport_modes.json` | `transport/modes.py` (tourism survey × `real_data.json` visitor estimates) | Transport page: tourists by mode, spend per tourist |
 | `transport_trends.json` | `transport/trends.py` (Google Trends; skipped if Google refuses) | Transport page: search interest |
 | `config/transport/walk_areas.json` | `scripts/fetch_walk_areas.py`, by hand (paths rarely change) | walking areas on the layer |
+| `config/transport/rail_lines.json` | `scripts/fetch_rail_lines.py`, by hand (track rarely changes): MLIT railway data N02 (国土数値情報, CC BY 4.0), 8 lines and 143 stations in and around Fukui | Train routes layer |
 
 Each part runs on its own. One that fails writes nothing, and the workflow only takes files that pass the app's
 `scripts/check_transport.mjs`, so the app keeps yesterday's file. Fares and revenue (`transport_market.json`) are
@@ -30,6 +31,7 @@ python scripts/fetch_data.py                     # the tourism survey, among the
 python scripts/build_transport.py --output-dir output/transport \
     --real-data ../dhde-app/public/data/real_data.json --refresh
 python scripts/fetch_walk_areas.py               # 6 requests to the public Valhalla server
+python scripts/fetch_rail_lines.py               # MLIT railway data (one 17 MB download)
 pytest tests/test_transport_gtfs.py tests/test_transport_modes.py
 ```
 
