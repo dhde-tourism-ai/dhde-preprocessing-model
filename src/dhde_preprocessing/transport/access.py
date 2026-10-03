@@ -17,8 +17,9 @@ GTFS-JP timetables listed in config/transport/config.json:
 - which feeds were used; a feed that ended before the reference week is left
   out entirely
 
-The map file holds the route lines and stops serving the nodes, plus the
-walking areas from config/transport/walk_areas.json (scripts/fetch_walk_areas.py).
+The map file holds the route lines serving the nodes and every stop on them, plus the
+walking areas from config/transport/walk_areas.json (scripts/fetch_walk_areas.py) and the
+railway lines and stations from config/transport/rail_lines.json (scripts/fetch_rail_lines.py).
 
 Run by scripts/build_transport.py.
 """
@@ -36,6 +37,7 @@ from .gtfs import INF, Network, build_network, earliest_arrival, haversine_m, hh
 REPO = Path(__file__).resolve().parents[3]
 CONFIG = REPO / "config" / "transport" / "config.json"
 WALK_AREAS = REPO / "config" / "transport" / "walk_areas.json"
+RAIL_LINES = REPO / "config" / "transport" / "rail_lines.json"
 CACHE = REPO / "output" / "transport_cache"
 JST = timezone(timedelta(hours=9))
 DAY_END = 24 * 3600 + 59 * 60  # trips after midnight still count for the service day
@@ -272,7 +274,7 @@ def route_lines(feeds: list, net: Network, route_ids: set[str]) -> list[dict]:
 
 
 def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, cache_dir: Path = CACHE,
-          config: Path = CONFIG, walk_areas: Path = WALK_AREAS) -> None:
+          config: Path = CONFIG, walk_areas: Path = WALK_AREAS, rail_lines: Path = RAIL_LINES) -> None:
     """Write transport.json and transport_map.json to out_dir."""
     cfg = json.loads(Path(config).read_text(encoding="utf-8"))
     walk = cfg["walk"]
@@ -342,6 +344,12 @@ def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, ca
         print(f"  {day} {d}: {len(net.conns)} connections")
         if day == "weekday":
             lines = route_lines(feeds, net, weekday_routes)
+            # Every stop those routes call at, so the map shows stops along the whole line;
+            # `nodes` stays empty for stops that aren't within reach of a site.
+            on_routes = net.calls.loc[net.calls["route_id"].isin(weekday_routes), "stop_id"].unique()
+            for r in net.stops[net.stops["stop_id"].isin(on_routes)].itertuples():
+                map_stops.setdefault(r.stop_id, {"id": r.stop_id, "name": r.stop_name, "feed": r.feed,
+                                                 "lat": round(float(r.lat), 6), "lon": round(float(r.lon), 6), "nodes": []})
 
     for k, n in nodes_out.items():
         all_days = n["days"].values()
@@ -360,8 +368,10 @@ def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, ca
     }
     walk_file = Path(walk_areas)
     areas = json.loads(walk_file.read_text(encoding="utf-8")) if walk_file.exists() else None
+    rail_file = Path(rail_lines)
+    rail = json.loads(rail_file.read_text(encoding="utf-8")) if rail_file.exists() else None
     tmap = meta | {"lines": lines, "stops": sorted(map_stops.values(), key=lambda s: s["id"]),
-                   "walk_areas": areas}
+                   "walk_areas": areas, "rail": rail}
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "transport.json").write_text(json.dumps(transport, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
