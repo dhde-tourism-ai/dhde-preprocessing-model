@@ -38,7 +38,9 @@ The two baselines a pickup method has to beat:
 backtest() stands at each past night's lead L, forecasts it with only the
 nights that had ended by then, and scores it against the final. The low/high
 range is the 10th-90th percentile of a method's errors before the held-out
-period, the ~80% range the app shows for its other forecasts.
+period, the ~80% range the app shows for its other forecasts (5th-95th at 60
+days, see RANGE_PCT_LONG). score_by_season() repeats the scoring on each
+season of the last year in turn.
 """
 from __future__ import annotations
 
@@ -57,6 +59,13 @@ LAST_YEAR_WINDOW = 14  # days either side of the night 364 days back
 METHODS = ("recent", "last_year", "blend")
 BASELINES = ("otb", "last_year_final")
 RANGE_PCT = (10, 90)
+# At 60 days the season moves between the training errors and the night, so
+# the 10-90 range covered only 63-70% of held-out nights on Echizen Coast and
+# Awara (review by Dina): use 5-95 there, and flag any range covering < 70%.
+RANGE_PCT_LONG = (5, 95)
+LONG_LEAD = 60
+RANGE_MIN_COVERAGE = 0.70
+SEASON_STARTS = (3, 6, 9, 12)  # spring, summer, autumn, winter
 WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 
@@ -96,11 +105,13 @@ def load_clean(repo: str) -> pd.DataFrame:
 
 def curves(clean: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     """Occupancy by night x lead from hotel._run_pipeline's output, and each
-    night's final occupancy (its own day's snapshot, unless that snapshot was
-    stale: a frozen feed repeats an earlier day, which isn't the final)."""
+    night's final occupancy (its own day's snapshot). Stale snapshots are
+    dropped at every lead: a frozen feed repeats an earlier day, which is
+    neither the final nor that lead's bookings (review by Dina)."""
+    clean = clean[~clean["is_stale"].astype(bool)]
     occ = clean.pivot_table(index="date_visit", columns="lead_time", values="occ", aggfunc="first")
     occ.index = pd.DatetimeIndex(occ.index)
-    day0 = clean[(clean["lead_time"] == 0) & ~clean["is_stale"].astype(bool)]
+    day0 = clean[clean["lead_time"] == 0]
     final = pd.Series(day0["occ"].to_numpy(), index=pd.DatetimeIndex(day0["date_visit"])).sort_index()
     return occ, final
 
@@ -160,22 +171,24 @@ def backtest(occ: pd.DataFrame, final: pd.Series, leads=LEADS) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def score(bt: pd.DataFrame, test_from: pd.Timestamp) -> pd.DataFrame:
-    """Error per lead and method on the held-out nights (on or after
-    `test_from`), in occupancy points, on the nights every method and baseline
-    could forecast. The range comes from the errors before `test_from`."""
+def score(bt: pd.DataFrame, test_from: pd.Timestamp, test_to: pd.Timestamp | None = None) -> pd.DataFrame:
+    """Error per lead and method on the held-out nights (from `test_from`, and
+    before `test_to` if given), in occupancy points, on the nights every method
+    and baseline could forecast. The range comes from the errors before
+    `test_from`."""
     cols = list(METHODS) + list(BASELINES)
     out = []
     for lead, g in bt.groupby("lead"):
         g = g.dropna(subset=cols)
-        train, test = g[g["night"] < test_from], g[g["night"] >= test_from]
+        train = g[g["night"] < test_from]
+        test = g[(g["night"] >= test_from) & ((g["night"] < test_to) if test_to is not None else True)]
         if test.empty:
             continue
         mae = {m: float((test[m] - test["final"]).abs().mean() * 100) for m in cols}
         for m in cols:
             err = (train[m] - train["final"]) if len(train) else pd.Series(dtype=float)
             if len(err) >= 30:
-                lo, hi = np.percentile(err, RANGE_PCT)
+                lo, hi = np.percentile(err, RANGE_PCT_LONG if lead >= LONG_LEAD else RANGE_PCT)
                 inside = ((test["final"] >= test[m] - hi) & (test["final"] <= test[m] - lo)).mean()
                 width = (hi - lo) * 100
             else:
@@ -188,5 +201,32 @@ def score(bt: pd.DataFrame, test_from: pd.Timestamp) -> pd.DataFrame:
                 "skill_vs_last_year": round(1 - mae[m] / mae["last_year_final"], 3) if mae["last_year_final"] else np.nan,
                 "range_width_pp": round(float(width), 1) if not np.isnan(width) else np.nan,
                 "range_coverage": round(float(inside), 2) if not np.isnan(inside) else np.nan,
+                "range_ok": bool(inside >= RANGE_MIN_COVERAGE) if not np.isnan(inside) else np.nan,
             })
     return pd.DataFrame(out)
+
+
+def season_folds(last_night: pd.Timestamp, months: int = 12) -> list[tuple[str, pd.Timestamp, pd.Timestamp]]:
+    """Held-out windows, one per season, covering about the last `months`
+    months up to `last_night`: (name, from, to). A last season shorter than
+    45 days joins the one before it."""
+    end = last_night + pd.Timedelta(days=1)
+    start = (last_night - pd.DateOffset(months=months)).to_period("M").start_time
+    edges = [d for d in pd.date_range(start, end, freq="MS") if d.month in SEASON_STARTS] + [end]
+    folds = []
+    for a, b in zip(edges, edges[1:]):
+        if folds and (b - a).days < 45:
+            folds[-1] = (folds[-1][0], folds[-1][1], b)
+            continue
+        name = {3: "spring", 6: "summer", 9: "autumn", 12: "winter"}[a.month] + f" {a:%Y}"
+        folds.append((name, a, b))
+    return folds
+
+
+def score_by_season(bt: pd.DataFrame, folds) -> pd.DataFrame:
+    """score() on each held-out season in turn (review by Dina: one summer is
+    too little to decide on). Each season's range comes from the nights before
+    it, so every fold only learns from the past."""
+    parts = [score(bt, a, b).assign(season=name) for name, a, b in folds]
+    parts = [p for p in parts if not p.empty]
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()

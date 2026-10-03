@@ -82,3 +82,35 @@ def test_score_reports_skill_against_the_baselines():
     s = pk.score(pk.backtest(occ, final, leads=(30,)), pd.Timestamp("2025-10-01")).set_index("method")
     assert s.loc["blend", "mae_pp"] == 0 and s.loc["blend", "skill_vs_otb"] == 1
     assert np.isclose(s.loc["otb", "bias_pp"], -9.0)
+
+
+def test_stale_snapshots_are_dropped_at_every_lead():
+    rows = []
+    for night in pd.date_range("2025-06-01", "2025-06-03"):
+        for lead in (0, 7):
+            rows.append({"date_visit": night, "lead_time": lead, "occ": 0.5 if lead else 0.8, "is_stale": False})
+    rows[1]["is_stale"] = True  # 1 June, lead 7: a frozen feed repeating an earlier day
+    occ, final = pk.curves(pd.DataFrame(rows))
+    assert np.isnan(occ.at[pd.Timestamp("2025-06-01"), 7])
+    assert occ.at[pd.Timestamp("2025-06-02"), 7] == 0.5 and len(final) == 3
+
+
+def test_season_folds_cover_the_last_year():
+    folds = pk.season_folds(pd.Timestamp("2026-09-28"))
+    assert [f[0] for f in folds] == ["autumn 2025", "winter 2025", "spring 2026", "summer 2026"]
+    assert folds[0][1] == pd.Timestamp("2025-09-01")
+    # September 2026 (28 days) joins the summer instead of standing alone.
+    assert folds[-1][1:] == (pd.Timestamp("2026-06-01"), pd.Timestamp("2026-09-29"))
+
+
+def test_score_by_season_flags_a_range_that_misses():
+    final = _flat()
+    occ = _curves(final, lambda lead: 0.003 * lead)
+    late = final.index >= "2025-09-01"
+    final2 = final.copy()
+    final2[late] += 0.2  # the season shifts: every late night ends far above its pickup
+    occ2 = _curves(final2, lambda lead: 0.003 * lead)
+    occ2.loc[late] = occ.loc[late]
+    s = pk.score_by_season(pk.backtest(occ2, final2, leads=(30,)), pk.season_folds(pd.Timestamp("2025-12-31")))
+    autumn = s[(s["season"] == "autumn 2025") & (s["method"] == "otb")].iloc[0]
+    assert autumn["range_coverage"] < pk.RANGE_MIN_COVERAGE and not autumn["range_ok"]
