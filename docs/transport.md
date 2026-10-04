@@ -16,10 +16,11 @@ visitor numbers.
 |---|---|---|
 | `transport.json` | `transport/access.py` (bus timetables, downloaded fresh each run) | Transport page; "Getting here" card in the node drawer |
 | `transport_map.json` | `transport/access.py` + `config/transport/walk_areas.json` + `config/transport/rail_lines.json` | Map → Movement → **Bus routes** (routes, every stop, walking areas) and **Train routes** (railway lines and stations) |
+| `transport_trips.json` | `transport/access.py` (every trip of the shown bus routes, per day type) | Map: moving buses on the Bus routes layer |
 | `transport_modes.json` | `transport/modes.py` (tourism survey × `real_data.json` visitor estimates) | Transport page: tourists by mode, spend per tourist |
 | `transport_trends.json` | `transport/trends.py` (Google Trends; skipped if Google refuses) | Transport page: search interest |
 | `config/transport/walk_areas.json` | `scripts/fetch_walk_areas.py`, by hand (paths rarely change) | walking areas on the layer |
-| `config/transport/rail_lines.json` | `scripts/fetch_rail_lines.py`, by hand (track rarely changes): MLIT railway data N02 (国土数値情報, CC BY 4.0), 8 lines and 143 stations in and around Fukui | Train routes layer |
+| `config/transport/rail_lines.json` | `scripts/fetch_rail_lines.py`, by hand (track rarely changes): MLIT railway data N02 (国土数値情報, CC BY 4.0), 8 lines and 143 stations in and around Fukui, track joined into continuous paths. Each line also carries an **illustrative** service (typical interval and speed) for the map's moving trains: rail timetables are not open data | Train routes layer, moving trains |
 
 Each part runs on its own. One that fails writes nothing, and the workflow only takes files that pass the app's
 `scripts/check_transport.mjs`, so the app keeps yesterday's file. Fares and revenue (`transport_market.json`) are

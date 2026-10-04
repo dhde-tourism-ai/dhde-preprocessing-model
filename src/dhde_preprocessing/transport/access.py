@@ -30,6 +30,7 @@ import statistics
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
 import requests
 
 from .gtfs import INF, Network, build_network, earliest_arrival, haversine_m, hhmm, journey, latest_departure, load_feed, walk_seconds
@@ -273,6 +274,30 @@ def route_lines(feeds: list, net: Network, route_ids: set[str]) -> list[dict]:
     return lines
 
 
+def trip_table(day_calls: dict[str, "pd.DataFrame"], stops: "pd.DataFrame", names: dict[str, str]) -> dict:
+    """Every trip of the shown routes per day type, compact, for the map's moving buses.
+
+    Stops and routes are indexed once; a trip is [route index, [stop indexes], [minutes]],
+    minutes after midnight of the service day (past 1440 after midnight), the departure
+    time at each stop in calling order.
+    """
+    stop_ids = sorted({s for c in day_calls.values() for s in c["stop_id"]})
+    sidx = {s: i for i, s in enumerate(stop_ids)}
+    pos = stops.drop_duplicates("stop_id").set_index("stop_id")
+    route_ids = sorted({r for c in day_calls.values() for r in c["route_id"]})
+    ridx = {r: i for i, r in enumerate(route_ids)}
+    trips: dict[str, list] = {}
+    for day, c in day_calls.items():
+        rows = []
+        for _, g in c.sort_values(["trip_id", "seq"]).groupby("trip_id", sort=False):
+            if len(g) < 2:
+                continue
+            rows.append([ridx[g["route_id"].iloc[0]], [sidx[x] for x in g["stop_id"]], [int(t) // 60 for t in g["dep"]]])
+        trips[day] = sorted(rows, key=lambda r: r[2][0])
+    return {"stops": [[round(float(pos.at[s, "lat"]), 5), round(float(pos.at[s, "lon"]), 5)] for s in stop_ids],
+            "routes": [{"id": r, "name": names.get(r, r)} for r in route_ids], "trips": trips}
+
+
 def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, cache_dir: Path = CACHE,
           config: Path = CONFIG, walk_areas: Path = WALK_AREAS, rail_lines: Path = RAIL_LINES) -> None:
     """Write transport.json and transport_map.json to out_dir."""
@@ -308,6 +333,8 @@ def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, ca
     weekday_routes: set[str] = set()
     map_stops: dict[str, dict] = {}
 
+    day_calls: dict[str, pd.DataFrame] = {}
+    route_names: dict[str, str] = {}
     for day, d in days.items():
         net = build_network(feeds, d, walk)
         used_dates[day] = net.used_dates
@@ -342,6 +369,10 @@ def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, ca
                 nodes_out[k]["stops"] = [{key: s[key] for key in ("id", "name", "feed", "lat", "lon", "distance_m")}
                                          | {"walk_min": round(s["walk_s"] / 60)} for s in served]
         print(f"  {day} {d}: {len(net.conns)} connections")
+        # trips of the routes calling at the sites today, for the moving buses
+        day_routes = {r["id"] for n in nodes_out.values() for r in n["days"][day].get("routes", [])}
+        day_calls[day] = net.calls.loc[net.calls["route_id"].isin(day_routes), ["trip_id", "stop_id", "seq", "dep", "route_id"]]
+        route_names |= dict(zip(net.calls["route_id"], net.calls["name"]))
         if day == "weekday":
             lines = route_lines(feeds, net, weekday_routes)
             # Every stop those routes call at, so the map shows stops along the whole line;
@@ -376,7 +407,12 @@ def build(out_dir: Path, *, start: date | None = None, refresh: bool = False, ca
     out.mkdir(parents=True, exist_ok=True)
     (out / "transport.json").write_text(json.dumps(transport, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     (out / "transport_map.json").write_text(json.dumps(tmap, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
-    print(f"[OK] wrote {out / 'transport.json'} and transport_map.json ({len(lines)} lines, {len(map_stops)} stops)")
+    trips = meta | {"note": "Scheduled bus trips (GTFS-JP) of the routes serving the sites, per day type, for the "
+                            "map's moving buses. Positions between stops are interpolated, not live.",
+                    "days": {k: v.isoformat() for k, v in days.items()}} | trip_table(day_calls, net.stops, route_names)
+    (out / "transport_trips.json").write_text(json.dumps(trips, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+    print(f"[OK] wrote {out / 'transport.json'}, transport_map.json ({len(lines)} lines, {len(map_stops)} stops) and "
+          f"transport_trips.json ({', '.join(f'{k} {len(v)}' for k, v in trips['trips'].items())} trips)")
     for k, n in nodes_out.items():
         wk = n["days"]["weekday"]
         fh, th = wk.get("from_hub"), wk.get("to_hub")

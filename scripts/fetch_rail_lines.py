@@ -31,15 +31,18 @@ PAGE = "https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N02-2024.html"
 BOX = (35.3, 135.35, 36.33, 136.9)  # lat_min, lon_min, lat_max, lon_max
 
 # (operator, line) in the data -> how the app names it. kind: shinkansen, rail, tram.
+# The last two values are ILLUSTRATIVE, for the map's moving trains only: a typical
+# daytime interval (minutes) and average speed including stops (km/h). Rail timetables
+# are not open data, so these are round figures, not a timetable.
 LINES = {
-    ("西日本旅客鉄道", "北陸新幹線"): ("hokuriku_shinkansen", "Hokuriku Shinkansen", "北陸新幹線", "shinkansen"),
-    ("ハピラインふくい", "ハピラインふくい線"): ("hapi_line", "Hapi-line Fukui", "ハピラインふくい線", "rail"),
-    ("えちぜん鉄道", "三国芦原線"): ("echizen_mikuni_awara", "Echizen Railway Mikuni-Awara Line", "えちぜん鉄道 三国芦原線", "rail"),
-    ("えちぜん鉄道", "勝山永平寺線"): ("echizen_katsuyama_eiheiji", "Echizen Railway Katsuyama-Eiheiji Line", "えちぜん鉄道 勝山永平寺線", "rail"),
-    ("福井鉄道", "福武線"): ("fukui_railway_fukubu", "Fukui Railway Fukubu Line", "福井鉄道 福武線", "tram"),
-    ("西日本旅客鉄道", "越美北線"): ("jr_etsumi_hoku", "JR Etsumi-Hoku Line (Kuzuryu Line)", "JR越美北線（九頭竜線）", "rail"),
-    ("西日本旅客鉄道", "小浜線"): ("jr_obama", "JR Obama Line", "JR小浜線", "rail"),
-    ("西日本旅客鉄道", "北陸線"): ("jr_hokuriku", "JR Hokuriku Line", "JR北陸線", "rail"),
+    ("西日本旅客鉄道", "北陸新幹線"): ("hokuriku_shinkansen", "Hokuriku Shinkansen", "北陸新幹線", "shinkansen", 30, 180),
+    ("ハピラインふくい", "ハピラインふくい線"): ("hapi_line", "Hapi-line Fukui", "ハピラインふくい線", "rail", 30, 55),
+    ("えちぜん鉄道", "三国芦原線"): ("echizen_mikuni_awara", "Echizen Railway Mikuni-Awara Line", "えちぜん鉄道 三国芦原線", "rail", 30, 35),
+    ("えちぜん鉄道", "勝山永平寺線"): ("echizen_katsuyama_eiheiji", "Echizen Railway Katsuyama-Eiheiji Line", "えちぜん鉄道 勝山永平寺線", "rail", 30, 35),
+    ("福井鉄道", "福武線"): ("fukui_railway_fukubu", "Fukui Railway Fukubu Line", "福井鉄道 福武線", "tram", 20, 22),
+    ("西日本旅客鉄道", "越美北線"): ("jr_etsumi_hoku", "JR Etsumi-Hoku Line (Kuzuryu Line)", "JR越美北線（九頭竜線）", "rail", 120, 40),
+    ("西日本旅客鉄道", "小浜線"): ("jr_obama", "JR Obama Line", "JR小浜線", "rail", 60, 45),
+    ("西日本旅客鉄道", "北陸線"): ("jr_hokuriku", "JR Hokuriku Line", "JR北陸線", "rail", 60, 55),
 }
 
 
@@ -71,6 +74,34 @@ def clip(coords: list[list[float]]) -> list[list[list[float]]]:
     return runs
 
 
+def stitch(paths: list[list[list[float]]]) -> list[list[list[float]]]:
+    """Join a line's track sections end to end into as few continuous paths as possible,
+    so a train can travel along them. Sections meeting at a junction start a new path."""
+    left = [p for p in paths if len(p) > 1]
+    chains = []
+    while left:
+        chain = left.pop(0)
+        grown = True
+        while grown:
+            grown = False
+            for i, p in enumerate(left):
+                if p[0] == chain[-1]:
+                    chain = chain + p[1:]
+                elif p[-1] == chain[-1]:
+                    chain = chain + p[::-1][1:]
+                elif p[-1] == chain[0]:
+                    chain = p + chain[1:]
+                elif p[0] == chain[0]:
+                    chain = p[::-1] + chain[1:]
+                else:
+                    continue
+                left.pop(i)
+                grown = True
+                break
+        chains.append(chain)
+    return sorted(chains, key=len, reverse=True)
+
+
 def main() -> None:
     r = requests.get(URL, timeout=300)
     r.raise_for_status()
@@ -82,9 +113,14 @@ def main() -> None:
         k = line_key(f["properties"])
         if not k:
             continue
-        lid, en, ja, kind = LINES[k]
-        line = lines.setdefault(lid, {"id": lid, "name": en, "name_ja": ja, "operator_ja": k[0], "kind": kind, "paths": []})
+        lid, en, ja, kind, every, kmh = LINES[k]
+        line = lines.setdefault(lid, {"id": lid, "name": en, "name_ja": ja, "operator_ja": k[0], "kind": kind, "paths": [],
+                                      "service": {"basis": "illustrative", "interval_min": every, "speed_kmh": kmh,
+                                                  "first": "06:00", "last": "23:00"}})
         line["paths"] += clip(f["geometry"]["coordinates"])
+
+    for line in lines.values():
+        line["paths"] = stitch(line["paths"])
 
     # A station served by several lines appears once per line; N02_005g groups them.
     stations: dict[str, dict] = {}
