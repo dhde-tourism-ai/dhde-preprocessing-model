@@ -277,7 +277,7 @@ def route_lines(feeds: list, net: Network, route_ids: set[str]) -> list[dict]:
 def trip_table(day_calls: dict[str, "pd.DataFrame"], stops: "pd.DataFrame", names: dict[str, str]) -> dict:
     """Every trip of the shown routes per day type, compact, for the map's moving buses.
 
-    Stops and routes are indexed once; a trip is [route index, [stop indexes], [minutes]],
+    Stops (position, id, name) and routes are indexed once; a trip is [route index, [stop indexes], [minutes]],
     minutes after midnight of the service day (past 1440 after midnight), the departure
     time at each stop in calling order.
     """
@@ -295,6 +295,7 @@ def trip_table(day_calls: dict[str, "pd.DataFrame"], stops: "pd.DataFrame", name
             rows.append([ridx[g["route_id"].iloc[0]], [sidx[x] for x in g["stop_id"]], [int(t) // 60 for t in g["dep"]]])
         trips[day] = sorted(rows, key=lambda r: r[2][0])
     return {"stops": [[round(float(pos.at[s, "lat"]), 5), round(float(pos.at[s, "lon"]), 5)] for s in stop_ids],
+            "stop_ids": stop_ids, "stop_names": [str(pos.at[s, "stop_name"]) for s in stop_ids],
             "routes": [{"id": r, "name": names.get(r, r)} for r in route_ids], "trips": trips}
 
 
