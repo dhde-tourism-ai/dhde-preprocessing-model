@@ -4,7 +4,7 @@ import joblib
 import pandas as pd
 
 from dhde_preprocessing import model_registry
-from dhde_preprocessing.forecast import FIT_PREDICT, HORIZON, feature_table, forecast
+from dhde_preprocessing.forecast import FIT_PREDICT, HORIZON, feature_table, forecast, with_weather
 from test_forecast import _table
 
 
@@ -27,11 +27,14 @@ def test_each_run_is_recorded_with_its_score_and_fitted_models(tmp_path):
     saved = joblib.load(tmp_path / "models" / v1 / "models.joblib")
     assert set(saved) == {"tojinbo", "katsuyama"}
     feats = feature_table(table, extra_days=HORIZON)
-    for node_key, (name, fitted) in saved.items():
+    for node_key, (name, by_horizon) in saved.items():
         future = feats[(feats["node_key"] == node_key) & feats["y"].isna()]
-        fitted = {node_key: fitted} if name == "regression" else fitted
-        pred = FIT_PREDICT[name][1](fitted, future).round()
-        assert list(pred) == list(fc.loc[fc["node_key"] == node_key, "predicted"])
+        assert sorted(by_horizon) == list(range(1, HORIZON + 1))
+        pred = []
+        for h in range(1, HORIZON + 1):
+            fitted = {node_key: by_horizon[h]} if name == "regression" else by_horizon[h]
+            pred += list(FIT_PREDICT[name][1](fitted, with_weather(future.iloc[[h - 1]], None)).round())
+        assert pred == list(fc.loc[fc["node_key"] == node_key, "predicted"])
 
 
 def test_compare_puts_the_latest_run_next_to_the_previous_one(tmp_path):

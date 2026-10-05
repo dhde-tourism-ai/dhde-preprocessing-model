@@ -98,7 +98,15 @@ KNOWN_AHEAD = {
     "awara_onsen": {"booked_lead7": "hotel_n_people_lead7"},
 }
 KNOWN_AHEAD_FEATURES = ["booked_lead7"]
-FEATURES = CALENDAR_FEATURES + LAG_FEATURES + KNOWN_AHEAD_FEATURES
+# The weather forecast for day d, issued as many days before d as d is ahead of the
+# forecast (sources/weather_ahead.py; see with_weather). Only at the outdoor sites:
+# in the backtest it cut Rainbow Line's WAPE from 38.9% to 35.2% and Tojinbo's from
+# 28.0% to 27.1%, and changed nothing (+-0.3 points) at the station, the museum and
+# the hotels, as expected of places where rain doesn't keep people away.
+WEATHER_NODES = {"tojinbo", "rainbow_line"}
+WEATHER_FEATURES = ["fc_rain_mm", "fc_temp_max"]
+WEATHER_COLUMNS = {"fc_rain_mm": "rain_mm", "fc_temp_max": "temp_max"}  # feature -> weather_ahead column prefix
+FEATURES = CALENDAR_FEATURES + LAG_FEATURES + KNOWN_AHEAD_FEATURES + WEATHER_FEATURES
 
 
 # --- features -------------------------------------------------------------
@@ -202,15 +210,17 @@ def build_features(y: pd.Series, extra_days: int = 0) -> pd.DataFrame:
 # --- models ---------------------------------------------------------------
 
 def _regression_matrix(f: pd.DataFrame, ahead: list[str]) -> pd.DataFrame:
-    """Design matrix. `ahead` (the node's KNOWN_AHEAD features) is fixed per
-    node, never inferred from which values happen to be present, so train
-    and test always have the same columns."""
+    """Design matrix. `ahead` (the node's KNOWN_AHEAD features, and
+    WEATHER_FEATURES when used) is fixed per fit, never inferred from which
+    values happen to be present, so train and test always have the same columns."""
     x = f[["is_day_off", "off_run_len", "prev_day_off", "next_day_off", "is_golden_week",
            "is_obon", "is_new_year", "same_weekday_mean", "roll28", "lag7_day_off"]].copy()
     x["same_weekday_mean"] = x["same_weekday_mean"].fillna(x["roll28"])
     x["lag7_day_off"] = x["lag7_day_off"].fillna(0)
     for col in ahead:
         x[col] = f[col]
+        if col in WEATHER_FEATURES:
+            continue
         # Nothing booked a week ahead = closed (Katsuyama: exactly its 47 closing days).
         # A linear model on log bookings can't reach 0 on its own; this lets it.
         x[f"{col}_is_zero"] = (f[col] == 0).astype(float).where(f[col].notna())
@@ -228,15 +238,17 @@ def _fit_ridge(tr: pd.DataFrame, ahead: list[str]) -> Ridge | None:
 def fit_regression(train: pd.DataFrame) -> dict[str, list[tuple[list[str], Ridge]]]:
     """One ridge regression per node, on log1p(target).
 
-    Nodes with week-ahead features get two fits: with them, and without
-    them (node -> [(columns, model), ...], full model first). A day
-    without its week-ahead value (a late feed) uses the second instead of
-    failing or returning NaN.
+    Up to three fits per node, fullest first (node -> [(columns, model), ...]):
+    with its week-ahead bookings and the weather forecast, with the bookings
+    only, and with neither. A day missing a value (a late feed, a day the
+    weather archive lacks) uses the next fit instead of failing or returning NaN.
     """
     fitted = {}
     for node_key, tr in train.groupby("node_key"):
         ahead = list(KNOWN_AHEAD.get(node_key, {}))
-        fits = [(cols, _fit_ridge(tr, cols)) for cols in ([ahead] if ahead else []) + [[]]]
+        sets = [ahead + WEATHER_FEATURES, ahead, []] if node_key in WEATHER_NODES else [ahead, []]
+        sets = [c for i, c in enumerate(sets) if c not in sets[:i]]  # a node without bookings: no duplicate fit
+        fits = [(cols, _fit_ridge(tr, cols)) for cols in sets]
         fitted[node_key] = [(cols, m) for cols, m in fits if m is not None]
     return fitted
 
@@ -296,10 +308,13 @@ MODELS = {
 
 # --- backtest and forecast ------------------------------------------------
 
-def feature_table(table: pd.DataFrame, extra_days: int = 0, full: pd.DataFrame | None = None) -> pd.DataFrame:
+def feature_table(table: pd.DataFrame, extra_days: int = 0, full: pd.DataFrame | None = None,
+                  weather: dict[str, pd.DataFrame] | None = None) -> pd.DataFrame:
     """Features per node. Targets come from `table` (the training table);
     KNOWN_AHEAD values come from `full` (the full integrated table, which
-    has them for the days being forecast), or from `table` if not given."""
+    has them for the days being forecast), or from `table` if not given;
+    the weather forecast at every lead from `weather` (node -> weather_ahead.load())
+    for WEATHER_NODES, else missing. with_weather() picks the lead."""
     ahead_src = table if full is None else full
     frames = []
     for node_key in TARGETS:
@@ -310,9 +325,49 @@ def feature_table(table: pd.DataFrame, extra_days: int = 0, full: pd.DataFrame |
         for feat in KNOWN_AHEAD_FEATURES:
             col = KNOWN_AHEAD.get(node_key, {}).get(feat)
             f[feat] = np.log1p(rows[col].reindex(f.index)) if col and col in rows else np.nan
+        w = (weather or {}).get(node_key) if node_key in WEATHER_NODES else None
+        w = w.set_index(pd.to_datetime(w["date"])) if w is not None else None
+        for col in _lead_columns():
+            f[col] = w[col].reindex(f.index).to_numpy(float) if w is not None and col in w else np.nan
         f["node_key"] = node_key
         frames.append(f.reset_index())
     return pd.concat(frames, ignore_index=True)
+
+
+def _lead_columns() -> list[str]:
+    return [f"{prefix}_lead{n}" for n in range(1, HORIZON + 1) for prefix in WEATHER_COLUMNS.values()]
+
+
+def with_weather(f: pd.DataFrame, horizon: int | None) -> pd.DataFrame:
+    """`f` with WEATHER_FEATURES set to the forecast issued `horizon` days before
+    each day. Training and test rows use the same lead, so a model fitted for
+    3 days ahead learns how much a 3-day-old forecast is worth. None: no weather."""
+    f = f.copy()
+    for feat, prefix in WEATHER_COLUMNS.items():
+        col = f"{prefix}_lead{horizon}"
+        f[feat] = f[col] if horizon is not None and col in f else np.nan
+    return f
+
+
+def weather_nodes(feats: pd.DataFrame) -> set[str]:
+    """WEATHER_NODES that have a weather forecast in `feats`."""
+    cols = [c for c in _lead_columns() if c in feats]
+    if not cols:
+        return set()
+    has = feats[cols].notna().any(axis=1).groupby(feats["node_key"]).any()
+    return set(has[has].index) & WEATHER_NODES
+
+
+def fit_plan(feats: pd.DataFrame) -> list[tuple[int | None, list[int], set[str]]]:
+    """(forecast lead, horizons, nodes) per fit. The nodes without weather share one
+    fit for all seven horizons, exactly as without weather. The weather nodes get one
+    fit per horizon on that horizon's lead, so a model never learns from a forecast
+    fresher than it will have. Every fit trains on all nodes (LightGBM is pooled);
+    only its own nodes are forecast with it."""
+    nodes = set(feats["node_key"])
+    wx = weather_nodes(feats)
+    plan = [(None, list(range(1, HORIZON + 1)), nodes - wx)] if nodes - wx else []
+    return plan + [(h, [h], wx) for h in range(1, HORIZON + 1) if wx]
 
 
 def _trainable(f: pd.DataFrame) -> pd.DataFrame:
@@ -323,17 +378,20 @@ def backtest(feats: pd.DataFrame, weeks: int = BACKTEST_WEEKS) -> pd.DataFrame:
     """Rolling-origin backtest: one row per (origin, node, date, model)."""
     last = feats.loc[feats["y"].notna(), "date"].max()
     origins = [last - pd.Timedelta(days=HORIZON * k) for k in range(weeks, 0, -1)]
+    plan = fit_plan(feats)
     rows = []
     for origin in origins:
-        train = _trainable(feats[feats["date"] <= origin])
-        test = _trainable(feats[(feats["date"] > origin) & (feats["date"] <= origin + pd.Timedelta(days=HORIZON))])
-        if test.empty:
-            continue
-        for name, fit_predict in MODELS.items():
-            rows.append(pd.DataFrame({
-                "origin": origin, "date": test["date"].to_numpy(), "node_key": test["node_key"].to_numpy(),
-                "model": name, "actual": test["y"].to_numpy(), "predicted": fit_predict(train, test),
-            }))
+        for lead, horizons, nodes in plan:
+            train = _trainable(with_weather(feats[feats["date"] <= origin], lead))
+            days = [origin + pd.Timedelta(days=h) for h in horizons]
+            test = _trainable(with_weather(feats[feats["date"].isin(days) & feats["node_key"].isin(nodes)], lead))
+            if test.empty:
+                continue
+            for name, fit_predict in MODELS.items():
+                rows.append(pd.DataFrame({
+                    "origin": origin, "date": test["date"].to_numpy(), "node_key": test["node_key"].to_numpy(),
+                    "model": name, "actual": test["y"].to_numpy(), "predicted": fit_predict(train, test),
+                }))
     out = pd.concat(rows, ignore_index=True)
     out["horizon"] = (out["date"] - out["origin"]).dt.days
     return out
@@ -402,30 +460,40 @@ def calibration(y: pd.Series, node_cfg: dict) -> dict:
     return info
 
 
-def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS,
-             full: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
+def forecast(table: pd.DataFrame, weeks: int = BACKTEST_WEEKS, full: pd.DataFrame | None = None,
+             weather: dict[str, pd.DataFrame] | None = None) -> tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
     """Returns (forecast rows, backtest scores, report, fitted models).
 
     Each node gets the model with the lowest backtest WAPE; its forecast
     for the 7 days after the last observed day, with a low/high range
     from that model's backtest errors at that node. Fitted models are
-    node -> (model name, what it was fitted to), for model_registry.
+    node -> (model name, {horizon: what it was fitted to}), for model_registry;
+    without weather all seven horizons share one fit.
     """
-    feats = feature_table(table, extra_days=HORIZON, full=full)
+    feats = feature_table(table, extra_days=HORIZON, full=full, weather=weather)
     scores = score(backtest(feats, weeks=weeks))  # future rows have no y, so they're never tested
     best = scores.loc[scores.groupby("node_key")["wape"].idxmin()].set_index("node_key")
     baseline = scores[scores["model"] == "baseline"].set_index("node_key")
 
     train = _trainable(feats)
-    fitted = {m: FIT_PREDICT[m][0](train) for m in best["model"].unique()}  # each chosen model fitted once
-    models = {node_key: (m, fitted[m].get(node_key, []) if m == "regression" else fitted[m])
-              for node_key, m in best["model"].items()}
+    plan = fit_plan(feats)
+    # Each chosen model fitted once per plan entry that has a node using it: (model, lead) -> fitted.
+    fitted = {(m, lead): FIT_PREDICT[m][0](with_weather(train, lead))
+              for lead, _, nodes in plan for m in set(best.loc[best.index.isin(nodes), "model"])}
+    lead_of = {(node_key, h): lead for lead, horizons, nodes in plan for node_key in nodes for h in horizons}
+    models = {}
     out, calib = [], {}
     for node_key, row in best.iterrows():
+        m = row["model"]
         nf = feats[feats["node_key"] == node_key]
         origin = nf.loc[nf["y"].notna(), "date"].max()
         future = nf[(nf["date"] > origin) & (nf["date"] <= origin + pd.Timedelta(days=HORIZON))]
-        pred = FIT_PREDICT[row["model"]][1](fitted[row["model"]], future)
+        by_h = {h: fitted[(m, lead_of[(node_key, h)])] for h in range(1, HORIZON + 1)}
+        models[node_key] = (m, {h: f.get(node_key, []) if m == "regression" else f for h, f in by_h.items()})
+        pred = np.concatenate([
+            FIT_PREDICT[m][1](by_h[h], with_weather(future.iloc[[h - 1]], lead_of[(node_key, h)]))
+            for h in range(1, len(future) + 1)
+        ])
         low = np.expm1(np.log1p(pred) + row["log_err_low"]).clip(min=0)
         high = np.expm1(np.log1p(pred) + row["log_err_high"])
         calib[node_key] = calibration(nf.set_index("date")["y"], load_node_config(node_key))

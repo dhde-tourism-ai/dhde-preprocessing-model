@@ -2,7 +2,9 @@
 """
 Backtest the forecast models and forecast the next 7 days per node.
 
-Run scripts/build_integrated.py first; this reads its training table.
+Run scripts/build_integrated.py first; this reads its training table. The
+outdoor sites' weather forecasts (forecast.WEATHER_NODES) are fetched from
+Open-Meteo's archive and cached (sources/weather_ahead.py).
 Writes output/forecast_fukui.parquet (plus .csv), forecast_fukui_backtest.csv
 (scores per node and model) and forecast_fukui_report.json, and records the
 run in output/model_registry.csv with its fitted models (see model_registry.py).
@@ -10,6 +12,7 @@ run in output/model_registry.csv with its fitted models (see model_registry.py).
 Usage:
     python scripts/build_forecast.py
     python scripts/build_forecast.py --weeks 12
+    python scripts/build_forecast.py --no-weather
 """
 from __future__ import annotations
 
@@ -25,7 +28,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import pandas as pd
 
 from dhde_preprocessing import model_registry
-from dhde_preprocessing.forecast import BACKTEST_WEEKS, PENDING, forecast, write_forecast
+from dhde_preprocessing.config import load_node_config
+from dhde_preprocessing.forecast import BACKTEST_WEEKS, PENDING, WEATHER_NODES, forecast, write_forecast
+from dhde_preprocessing.sources import weather_ahead
 
 
 def main() -> None:
@@ -35,11 +40,16 @@ def main() -> None:
     parser.add_argument("--full", default="output/integrated_fukui.parquet",
                         help="full integrated table, for values known ahead (week-ahead museum bookings)")
     parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--no-weather", action="store_true", help="forecast without the weather forecast")
     args = parser.parse_args()
 
     table = pd.read_parquet(args.input)
     full = pd.read_parquet(args.full) if Path(args.full).exists() else None
-    fc, scores, report, models = forecast(table, weeks=args.weeks, full=full)
+    weather = None if args.no_weather else {k: weather_ahead.load(load_node_config(k)) for k in sorted(WEATHER_NODES)}
+    for k, w in (weather or {}).items():
+        print(f"weather forecast archive, {k}: {len(w)} day(s) to {w['date'].max():%Y-%m-%d}" if len(w)
+              else f"WARNING: no weather forecast for {k} (Open-Meteo unreachable, no cache): forecast without it")
+    fc, scores, report, models = forecast(table, weeks=args.weeks, full=full, weather=weather)
 
     print(f"\nBacktest, last {args.weeks} weeks (WAPE, lower is better):")
     wide = scores.pivot(index="node_key", columns="model", values="wape")

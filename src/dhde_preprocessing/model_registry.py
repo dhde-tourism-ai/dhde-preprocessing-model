@@ -15,7 +15,7 @@ It appends one row per node (daily) or series (monthly) to
 MAPE), `baseline_error_pct` that of the baseline on the same days, so a
 row says both how good the model is and how much it beats "same as last
 week/year". The fitted daily models are saved with joblib in
-`output/models/<version>/models.joblib` (node -> (model name, fitted));
+`output/models/<version>/models.joblib` (node -> (model name, {horizon: fitted}));
 the monthly models are fixed rules with nothing fitted, so the version's
 commit is enough to rerun them.
 """
