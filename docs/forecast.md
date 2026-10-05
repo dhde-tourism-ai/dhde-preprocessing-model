@@ -106,8 +106,35 @@ later information can reach it.
   and gap filling look at later snapshots. The two agree on 99.5% of
   days.
 
-**Left out for now:** weather (only forecasts are known in advance; wiring
-the EC2 box's saved JMA forecasts in is the next step), hotel at the other
+**Weather forecast** (Tojinbo and Rainbow Line only): daytime rain
+(09:00 to 18:00, mm) and the day's highest temperature from JMA's model
+(`sources/weather_ahead.py`). Only the forecast is known in advance, so a
+day forecast h days ahead gets the forecast issued h days before it, from
+Open-Meteo's archive of past model runs (back to March 2024, so the whole
+training period has it). Each of the 7 horizons is fitted and backtested on
+its own lead, so a model never learns from a fresher forecast than it will
+have live. The other nodes keep exactly the model they had: their forecasts
+and scores are identical with or without weather.
+
+What it changed (26-week backtest, best model):
+
+| Node | Without | With | |
+|---|---|---|---|
+| Rainbow Line | 38.9% | 35.3% | LightGBM both times |
+| Tojinbo | 28.0% | 26.7% | regression, now LightGBM |
+
+Tried and not used:
+- The weather that actually happened (cheating, an upper bound): Rainbow
+  Line 31.2%, Tojinbo 23.4%. So weather matters; a forecast gets part of it.
+- The forecast from 7 days before for every horizon: worse everywhere
+  (Rainbow Line 39.4%). A week out, its daily rain correlates 0.2 with the
+  rain that fell; 1 day out, 0.5.
+- Weather at all five nodes: Fukui Station, Katsuyama (indoor museum) and
+  Awara Onsen (hotel guests booked ahead) moved by 0.3 points or less, and
+  Katsuyama got slightly worse, so they are left without it. Chosen by what
+  the sites are, which the numbers agree with.
+
+**Left out for now:** hotel at the other
 nodes (the training table holds final bookings, and the week-ahead value
 is the regional feed, not the site), RSI (5 days late, short town-level
 history), traffic (~90 days).
@@ -140,18 +167,20 @@ the busy summer weeks), so the wider band is used and read as a roughly
 check is itself a small choice made on test data; the next months'
 coverage is the real test.
 
-## Results (backtest to 2026-09-27, WAPE)
+## Results (backtest to 2026-09-28, WAPE)
 
 | Node | Baseline | Regression | LightGBM | Used |
 |---|---|---|---|---|
-| Fukui Station | 20.3% | 16.0% | 15.2% | LightGBM |
-| Tojinbo | 37.1% | 27.7% | 28.6% | Regression |
-| Rainbow Line | 47.8% | 42.0% | 38.5% | LightGBM |
-| Katsuyama | 67.3% | 13.4% | 24.3% | Regression |
-| Awara Onsen | 26.6% | 2.8% | 6.0% | Regression |
+| Fukui Station | 21.0% | 15.9% | 15.3% | LightGBM |
+| Tojinbo | 38.3% | 27.1% | 26.7% | LightGBM (with weather) |
+| Rainbow Line | 48.6% | 41.7% | 35.3% | LightGBM (with weather) |
+| Katsuyama | 69.7% | 13.4% | 24.7% | Regression |
+| Awara Onsen | 26.8% | 2.8% | 6.4% | Regression |
 
-Range coverage on unseen weeks, for the model used: Fukui Station 77%,
-Tojinbo 74%, Rainbow Line 91%, Katsuyama 89%, Awara Onsen 80%.
+Range coverage on unseen weeks, for the model used: Fukui Station 75%,
+Tojinbo 68%, Rainbow Line 93%, Katsuyama 87%, Awara Onsen 82%. Tojinbo's
+range is the one to watch: LightGBM's caught 68% of later days, against 75%
+for the regression it used before weather.
 
 **Why Awara Onsen scores so well:** about 96% of its final guests are
 already booked 7 days ahead (median), so the week-ahead bookings alone
@@ -165,7 +194,7 @@ that.
 
 The briefing's baseline figures (22% at Fukui Station, 44% at Tojinbo)
 were measured on a different window; on this one the baseline is
-20.3% and 37.1%. Numbers shift slightly day to day as the 26-week window moves.
+21.0% and 38.3%. Numbers shift slightly day to day as the 26-week window moves.
 
 ## Known limits and next steps
 
@@ -178,8 +207,9 @@ were measured on a different window; on this one the baseline is
   it as those hotels' guests, not the town's total.
 - **Rainbow Line** is small and lumpy (tens to hundreds of cars, many
   zero days in winter), so percentage errors stay large.
-- **Weather forecasts** are the next feature to add (rain for the museum,
-  wind, rain and snow for Rainbow Line).
+- **More weather:** wind and snow for Rainbow Line (a mountain toll road)
+  and wind for Tojinbo (a cliff coast) are the next to try, in the same
+  archive.
 - **School holidays** helped a little in a test (Fukui Station 16.1% to
   15.3%) but only with approximate national dates, so they're left out
   until Fukui Prefecture's official school calendar is in.

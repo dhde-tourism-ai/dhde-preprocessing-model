@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 
 from dhde_preprocessing.forecast import (
-    CALENDAR_FEATURES, HORIZON, LAG_FEATURES, backtest, build_features, calendar, feature_table, forecast, node_target,
+    CALENDAR_FEATURES, HORIZON, LAG_FEATURES, backtest, build_features, calendar, feature_table, fit_plan, forecast,
+    node_target, with_weather,
 )
 
 
@@ -195,3 +196,41 @@ def test_visitor_factor_can_use_a_fiscal_year():
     y = pd.Series(np.where(dates < pd.Timestamp("2025-04-01"), 10.0, 100.0), index=dates)
     info = calibration(y, {"official_visitors": {"period": ["2025-04-01", "2026-03-31"], "count": 73_000}})
     assert np.isclose(info["factor"], 73_000 / (100 * 365))  # January-March 2025 (10/day) is outside the FY
+
+
+def _weather(table, value=lambda lead, n: np.full(n, float(lead))):
+    """weather_ahead.load()-shaped forecasts for every day of `table` and a week after it."""
+    dates = pd.date_range(table["date"].min(), table["date"].max() + pd.Timedelta(days=HORIZON))
+    w = pd.DataFrame({"date": dates})
+    for lead in range(1, HORIZON + 1):
+        w[f"rain_mm_lead{lead}"] = value(lead, len(dates))
+        w[f"temp_max_lead{lead}"] = 20.0
+    return w
+
+
+def test_a_day_h_ahead_uses_the_weather_forecast_issued_h_days_before_it():
+    """Leakage guard: a forecast h days ahead only has the weather forecast made h
+    days earlier, never a fresher one, and only the outdoor sites use weather."""
+    table = _table()
+    feats = feature_table(table, extra_days=HORIZON, weather={"tojinbo": _weather(table), "katsuyama": _weather(table)})
+    for h in range(1, HORIZON + 1):
+        f = with_weather(feats, h)
+        assert (f.loc[f["node_key"] == "tojinbo", "fc_rain_mm"] == h).all()
+        assert f.loc[f["node_key"] == "katsuyama", "fc_rain_mm"].isna().all()  # indoor: no weather
+    assert fit_plan(feats) == [(None, list(range(1, HORIZON + 1)), {"katsuyama"})] +         [(h, [h], {"tojinbo"}) for h in range(1, HORIZON + 1)]
+    bt = backtest(feats, weeks=2)
+    assert sorted(bt.loc[bt["node_key"] == "tojinbo", "horizon"].unique()) == list(range(1, HORIZON + 1))
+
+
+def test_nodes_without_weather_forecast_the_same_with_or_without_it():
+    table = _table()
+    rng = np.random.default_rng(1)
+    weather = {"tojinbo": _weather(table, lambda lead, n: rng.gamma(0.5, 4, n))}
+    plain, plain_scores, _, _ = forecast(table, weeks=4)
+    wet, wet_scores, _, models = forecast(table, weeks=4, weather=weather)
+    pd.testing.assert_frame_equal(plain[plain["node_key"] == "katsuyama"].reset_index(drop=True),
+                                  wet[wet["node_key"] == "katsuyama"].reset_index(drop=True))
+    k = lambda s: s[s["node_key"] == "katsuyama"].reset_index(drop=True)
+    pd.testing.assert_frame_equal(k(plain_scores), k(wet_scores))
+    _, tojinbo_fits = models["tojinbo"]
+    assert sorted(tojinbo_fits) == list(range(1, HORIZON + 1))
