@@ -88,11 +88,8 @@ sources:
     adult_num: 2
 
   instagram:
-    enabled: false
-    reason: >
-      Instagram location id not found yet. Look it up with the Collect
-      Instagram posts workflow (find_places: レインボーライン山頂公園, Rainbow Line), then set
-      location_id and enabled: true.
+    enabled: true  # weekly post total via Apify (collect-instagram.yml); see sources/instagram.py
+    location_id: "236826460"  # instagram.com/explore/locations/236826460/, 三方五湖レインボーライン, 15,032 posts; summit park, the most used tag there (checked 2026-10-07)
 
   social_listening:
     enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py
