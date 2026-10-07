@@ -137,7 +137,7 @@ def find_places(names: list[str], token: str, per_name: int = 5) -> None:
         print(f"\n{name}: {len(items)} candidate(s)")
         for it in items:
             loc = it.get("location") or {}
-            pid = it.get("id") or it.get("locationId") or loc.get("pk") or loc.get("id")
+            pid = it.get("location_id") or it.get("id") or it.get("locationId") or loc.get("pk") or loc.get("id")
             lat = it.get("lat") or it.get("latitude") or loc.get("lat")
             lng = it.get("lng") or it.get("longitude") or loc.get("lng")
             posts = it.get("postsCount") or it.get("mediaCount") or it.get("media_count")
