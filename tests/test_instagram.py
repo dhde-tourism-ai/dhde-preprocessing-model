@@ -132,3 +132,42 @@ def test_a_second_run_on_the_same_day_keeps_the_first_runs_coverage(live_root):
     ig.append("tojinbo", empty, {**run, "covered_from": "2026-10-02", "covered_to": "2026-10-04"})  # no-op
     runs = pd.read_csv(ig.run_log_path("tojinbo"), dtype={"location_id": str})
     assert len(runs) == 2 and len(ig.covered_days(runs)) == 34  # 1 Sep to 4 Oct
+
+
+# ---- weekly totals (since 2026-10: a logged-out location page shows only top posts) ----
+
+def test_totals_give_new_posts_between_snapshots(live_root):
+    ig.append_total("eiheiji", "265778687", 22150, "2026-10-07")
+    ig.append_total("eiheiji", "265778687", 22190, "2026-10-12")  # moved on
+    ig.append_total("eiheiji", "265778687", 22230, "2026-10-14")
+    ig.append_total("eiheiji", "265778687", 22231, "2026-10-14")  # same-day rerun: the later count
+    ig.append_total("eiheiji", "265778687", 22200, "2026-10-21")  # went down: not new posts
+    d = ig.totals_daily(pd.read_csv(ig.totals_path("eiheiji"), dtype={"location_id": str})).set_index("date")
+    assert d["instagram_media_total"].tolist() == [22150, 22190, 22231, 22200]
+    assert pd.isna(d.loc["2026-10-07", "instagram_new_posts"])  # first snapshot
+    assert (d.loc["2026-10-12", "instagram_new_posts"], d.loc["2026-10-12", "instagram_new_posts_days"]) == (40, 5)
+    assert d.loc["2026-10-14", "instagram_new_posts"] == 41
+    assert pd.isna(d.loc["2026-10-21", "instagram_new_posts"])
+
+
+def test_load_instagram_with_totals_only(live_root):
+    ig.append_total("eiheiji", "265778687", 22150, "2026-10-07")
+    ig.append_total("eiheiji", "265778687", 22190, "2026-10-14")
+    cfg = {"node_key": "eiheiji", "sources": {"instagram": {"enabled": True, "location_id": "265778687"}}}
+    df, report = ig.load_instagram(cfg)
+    assert report.status == "ok" and df["instagram_new_posts"].dropna().tolist() == [40]
+
+
+def test_collector_records_a_total_and_nothing_without_one(live_root, capsys):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import collect_instagram as ci
+    ci.store_total({"location_id": "265778687", "name": "x", "media_count": 22150}, "eiheiji", "265778687",
+                   "2026-10-07")
+    ci.store_total({"location_id": "265778687", "error": "not_found"}, "eiheiji", "265778687", "2026-10-08")
+    ci.store_total({"location_id": "999", "media_count": 5}, "eiheiji", "265778687", "2026-10-09")
+    log = pd.read_csv(ig.totals_path("eiheiji"))
+    assert log["media_count"].tolist() == [22150]  # the error and the wrong place record nothing
+    out = capsys.readouterr().out
+    assert "not_found" in out and "not 265778687" in out

@@ -121,6 +121,7 @@ EXPECTED_COLUMNS = FRONT_COLUMNS + [
     "instagram_posts", "instagram_photos", "instagram_videos", "instagram_likes", "instagram_comments",
     *[f"instagram_script_{s}" for s in ("ja", "ko", "zh", "latin", "none")],
     "instagram_scored", "instagram_positive", "instagram_neutral", "instagram_negative", "instagram_sentiment_mean",
+    "instagram_media_total", "instagram_new_posts", "instagram_new_posts_days",
     "social_mentions", "social_posts", "social_comments", "social_likes",
     *[f"social_{p}_mentions" for p in ("bluesky", "youtube", "reddit")],
     "social_positive", "social_neutral", "social_negative", "social_scored", "social_translated",

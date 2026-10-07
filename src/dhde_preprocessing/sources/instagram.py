@@ -1,7 +1,19 @@
 """
-Instagram posts tagged at each node's location: how many per day, of
-which kind, their likes and comments, and the script their caption is
-written in.
+Instagram posts tagged at each node's location.
+
+Since October 2026 this is a weekly total, not the posts themselves.
+Logged out, a location page only shows Instagram's "top posts" (on
+2026-10-07 Eiheiji's were from May 2026 and November 2025), so posts per
+day can't be counted from it. The page does give `media_count`, the
+number of posts ever tagged there. A weekly snapshot of it gives
+instagram_media_total, and the difference from the previous snapshot,
+instagram_new_posts over instagram_new_posts_days days: real, though
+not split by day, kind or language. Only the location's own fields are
+downloaded, never posts or usernames.
+
+The per-post log below (posts, kinds, likes, caption script and
+sentiment) is kept for exports someone ran by hand with recent posts in
+them (scripts/collect_instagram.py --import).
 
 Optional source: only nodes that declare `instagram` with a
 `location_id` get it (see join.OPTIONAL_SOURCES). It feeds the app's
@@ -44,8 +56,9 @@ old, so likes per day follow the weekday of the run as much as
 engagement: compare weekly totals, don't chart likes by day.
 
 Files, under the live-data root:
-    instagram/{node_key}.csv        one row per post
-    instagram/{node_key}_runs.csv   one row per run: its coverage
+    instagram/{node_key}_totals.csv one row per weekly snapshot of media_count
+    instagram/{node_key}.csv        one row per post (imports only)
+    instagram/{node_key}_runs.csv   one row per import: its coverage
 """
 from __future__ import annotations
 
@@ -64,6 +77,7 @@ LOG_DIR = "instagram"
 POST_COLS = ["post_hash", "location_id", "date", "kind", "likes", "comments", "script", "sentiment",
              "label", "scraped_at"]
 RUN_COLS = ["run_date", "location_id", "fetched", "capped", "covered_from", "covered_to"]
+TOTAL_COLS = ["run_date", "location_id", "media_count", "scraped_at"]
 JST = timezone(timedelta(hours=9))
 # Apify's type -> ours. Sidecar is a carousel of several images or videos.
 KINDS = {"Image": "photo", "Sidecar": "carousel", "Video": "video"}
@@ -82,6 +96,48 @@ def post_log_path(node_key: str) -> str:
 
 def run_log_path(node_key: str) -> str:
     return resolve_live_path(f"{LOG_DIR}/{node_key}_runs.csv")
+
+
+def totals_path(node_key: str) -> str:
+    return resolve_live_path(f"{LOG_DIR}/{node_key}_totals.csv")
+
+
+def append_total(node_key: str, location_id: str, media_count: int, run_date: str) -> int:
+    """Add one snapshot of the location's post total; returns snapshots in the log.
+    A second run on the same day replaces that day's snapshot (a later count)."""
+    path = totals_path(node_key)
+    old = read_csv_if_exists(path, dtype={"location_id": str})
+    row = pd.DataFrame([{"run_date": run_date, "location_id": str(location_id), "media_count": int(media_count),
+                         "scraped_at": pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ")}])
+    log = pd.concat([old, row], ignore_index=True) if old is not None else row
+    log = log.drop_duplicates(["run_date", "location_id"], keep="last").sort_values("run_date", kind="stable")
+    write_csv(log[TOTAL_COLS], path)
+    return len(log)
+
+
+def totals_daily(totals: pd.DataFrame) -> pd.DataFrame:
+    """Snapshots -> one row per snapshot day: instagram_media_total, and the posts
+    since the previous snapshot (instagram_new_posts) over instagram_new_posts_days.
+
+    New posts are missing on the first snapshot, after a location change, and when
+    the total went down (posts deleted or a recount): a difference that can't be
+    read as new posts isn't shown as one.
+    """
+    t = totals.copy()
+    t["date"] = pd.to_datetime(t["run_date"])
+    t["media_count"] = pd.to_numeric(t["media_count"], errors="coerce")
+    t = t.dropna(subset=["media_count"]).sort_values("date", kind="stable")
+    prev = t.shift(1)
+    same_place = prev["location_id"].astype(str) == t["location_id"].astype(str)
+    new = (t["media_count"] - prev["media_count"]).where(same_place)
+    days = (t["date"] - prev["date"]).dt.days.where(same_place)
+    ok = new.notna() & (new >= 0) & (days > 0)
+    return pd.DataFrame({
+        "date": t["date"].values,
+        "instagram_media_total": t["media_count"].astype(int).values,
+        "instagram_new_posts": new.where(ok).values,
+        "instagram_new_posts_days": days.where(ok).values,
+    })
 
 
 def _hash(post_id) -> str:
@@ -252,14 +308,25 @@ def load_instagram(node_cfg: dict) -> tuple[pd.DataFrame | None, SourceReport]:
 
     posts = read_csv_if_exists(post_log_path(node_key))
     runs = read_csv_if_exists(run_log_path(node_key))
-    if runs is None or runs.empty:
+    totals = read_csv_if_exists(totals_path(node_key), dtype={"location_id": str})
+    has_runs = runs is not None and not runs.empty
+    has_totals = totals is not None and not totals.empty
+    if not has_runs and not has_totals:
         return None, SourceReport(source="instagram", node_key=node_key, status="error",
-                                   notes=["no post log yet: run scripts/collect_instagram.py, "
+                                   notes=["no Instagram log yet: run scripts/collect_instagram.py, "
                                           "or point DHDE_LIVE_DATA_ROOT at a checkout of the live-data branch"])
-    if posts is None:
-        posts = pd.DataFrame(columns=POST_COLS)
-
-    daily = to_daily(posts, runs)
-    notes = [f"{len(posts)} post(s) in the log, {len(runs)} run(s), last on {runs.iloc[-1]['run_date']}",
-             "days outside a run's coverage are missing, not 0; likes and comments are counts at scrape time"]
+    notes = []
+    parts = []
+    if has_runs:
+        if posts is None:
+            posts = pd.DataFrame(columns=POST_COLS)
+        parts.append(to_daily(posts, runs))
+        notes.append(f"{len(posts)} imported post(s), {len(runs)} import(s); days outside their coverage are "
+                     "missing, not 0; likes and comments are counts at scrape time")
+    if has_totals:
+        parts.append(totals_daily(totals))
+        notes.append(f"{len(totals)} weekly total(s), last on {totals['run_date'].max()}: "
+                     "new posts are the change between snapshots, missing on the first one")
+    daily = parts[0] if len(parts) == 1 else parts[0].merge(parts[1], on="date", how="outer")
+    daily = daily.sort_values("date").reset_index(drop=True)
     return daily, validate_daily(daily, source="instagram", node_key=node_key, notes=notes)
