@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
 """
-Collect new Instagram posts tagged at every node that has an `instagram`
-source with a `location_id`, and append them to {out}/instagram/
-(see sources/instagram.py for what's kept).
+Record how many Instagram posts are tagged at every node that has an
+`instagram` source with a `location_id`, in {out}/instagram/ (see
+sources/instagram.py for why a weekly total, not the posts).
 
-Two ways in:
+Three ways in:
 - Default: run the Apify "Instagram Scraper" actor on each location page
-  for posts since the last run. Needs APIFY_TOKEN in the environment;
-  without it this prints a warning and exits 0. Meant to run weekly (see
+  and save its media_count, one snapshot per run. Only the location's own
+  fields are downloaded. Needs APIFY_TOKEN; without it this prints a
+  warning and exits 0. Meant to run weekly (see
   .github/workflows/collect-instagram.yml), which commits --out to the
   `live-data` branch.
-- --import FILE --location-id ID --node NODE: load an export someone
-  already ran by hand on one location (the actor's JSON or CSV download).
-  No token needed.
-
+- --import FILE --location-id ID --node NODE: load an export with recent
+  posts someone ran by hand on one location (the actor's JSON or CSV
+  download) into the per-post log. No token needed.
 - --find-places "NAME, NAME": look up Instagram place ids by name and
   print the candidates (id, name, coordinates, post count) to pick one for
   a node's `instagram.location_id`. Needs APIFY_TOKEN; stores nothing.
 
-Cost on Apify's free plan: about $0.0027 a post. The first run looks back
---first-days days; later runs only fetch what's new.
+A weekly run is one small actor run per location.
 
 Usage:
     python scripts/collect_instagram.py --out history
@@ -33,7 +32,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -87,14 +86,8 @@ def _apify(method: str, url: str, token: str, **kw) -> dict | list:
     return resp.json()
 
 
-def scrape(location_id: str, since: str, limit: int, token: str) -> pd.DataFrame:
-    run_input = {
-        "directUrls": [location_url(location_id)],
-        "resultsType": "posts",
-        "resultsLimit": limit,
-        "onlyPostsNewerThan": since,
-        "addParentData": False,
-    }
+def run_actor(run_input: dict, token: str) -> str:
+    """Start the actor, wait for it, and return its dataset id."""
     run = _apify("POST", f"{APIFY}/acts/{ACTOR}/runs?waitForFinish=60", token, json=run_input)["data"]
     deadline = time.time() + RUN_TIMEOUT_S
     while run["status"] in ("READY", "RUNNING"):
@@ -103,29 +96,48 @@ def scrape(location_id: str, since: str, limit: int, token: str) -> pd.DataFrame
         run = _apify("GET", f"{APIFY}/actor-runs/{run['id']}?waitForFinish=60", token)["data"]
     if run["status"] != "SUCCEEDED":
         raise RuntimeError(f"Apify run {run['status']}")
-    # Fields we don't keep are dropped at the source, so captions never leave
-    # memory and usernames are never downloaded.
-    fields = "id,type,timestamp,likesCount,commentsCount,caption,locationId,error"
-    items = _apify("GET", f"{APIFY}/datasets/{run['defaultDatasetId']}/items?clean=true&format=json&fields={fields}",
-                   token)
-    return pd.DataFrame(items)
+    return run["defaultDatasetId"]
+
+
+def scrape_total(location_id: str, token: str) -> dict:
+    """The location page's own fields: its id, name and media_count (posts ever
+    tagged there). Only these are downloaded: the page's "top posts", with their
+    usernames, are left on Apify."""
+    run_input = {"directUrls": [location_url(location_id)], "resultsType": "posts", "resultsLimit": 1,
+                 "addParentData": False}
+    dataset = run_actor(run_input, token)
+    fields = "location_id,name,media_count,error,errorDescription"
+    items = _apify("GET", f"{APIFY}/datasets/{dataset}/items?clean=true&format=json&fields={fields}", token)
+    return next((it for it in items if str(it.get("location_id")) == str(location_id)), items[0] if items else {})
+
+
+def store_total(item: dict, node_key: str, location_id: str, run_date: str) -> None:
+    """One snapshot of the location's post total. Anything but a number for this
+    location records nothing: a missing total stays missing."""
+    count = item.get("media_count")
+    if str(item.get("location_id", location_id)) != str(location_id):
+        print(f"::warning::{node_key}: the scraper answered for location {item.get('location_id')}, not "
+              f"{location_id}; nothing recorded. Check instagram.location_id in config/nodes/{node_key}.yaml")
+        return
+    if not isinstance(count, (int, float)) or count < 0:
+        why = item.get("error") or item.get("errorDescription") or "no media_count in the result"
+        print(f"::warning::{node_key}: no post total for location {location_id} ({why}); nothing recorded "
+              "(missing, not 0)")
+        return
+    n = ig.append_total(node_key, location_id, int(count), run_date)
+    print(f"  {node_key}: {int(count):,} posts tagged at {item.get('name') or location_id}; {n} snapshot(s) in the log")
 
 
 def find_places(names: list[str], token: str, per_name: int = 5) -> None:
     """Print Instagram place candidates for each name. Nothing is stored."""
     for name in names:
         run_input = {"search": name, "searchType": "place", "searchLimit": per_name, "resultsType": "details"}
-        run = _apify("POST", f"{APIFY}/acts/{ACTOR}/runs?waitForFinish=60", token, json=run_input)["data"]
-        deadline = time.time() + RUN_TIMEOUT_S
-        while run["status"] in ("READY", "RUNNING"):
-            if time.time() > deadline:
-                raise RuntimeError(f"Apify run still {run['status']} after {RUN_TIMEOUT_S}s")
-            run = _apify("GET", f"{APIFY}/actor-runs/{run['id']}?waitForFinish=60", token)["data"]
-        items = _apify("GET", f"{APIFY}/datasets/{run['defaultDatasetId']}/items?clean=true&format=json", token)
+        dataset = run_actor(run_input, token)
+        items = _apify("GET", f"{APIFY}/datasets/{dataset}/items?clean=true&format=json", token)
         print(f"\n{name}: {len(items)} candidate(s)")
         for it in items:
             loc = it.get("location") or {}
-            pid = it.get("id") or it.get("locationId") or loc.get("pk") or loc.get("id")
+            pid = it.get("location_id") or it.get("id") or it.get("locationId") or loc.get("pk") or loc.get("id")
             lat = it.get("lat") or it.get("latitude") or loc.get("lat")
             lng = it.get("lng") or it.get("longitude") or loc.get("lng")
             posts = it.get("postsCount") or it.get("mediaCount") or it.get("media_count")
@@ -178,7 +190,8 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
                         help="posts per location per run (for --import, the cap it was run with)")
     parser.add_argument("--find-places", nargs="+", metavar="NAME", help="look up Instagram place ids by name")
-    parser.add_argument("--first-days", type=int, default=FIRST_DAYS, help="how far a node's first run looks back")
+    # Unused since live runs record weekly totals; kept so the workflow's first_days input still parses.
+    parser.add_argument("--first-days", type=int, default=FIRST_DAYS, help=argparse.SUPPRESS)
     args = parser.parse_args()
     os.environ["DHDE_LIVE_DATA_ROOT"] = str(Path(args.out).resolve())
     today = datetime.now(ig.JST).date()
@@ -205,13 +218,10 @@ def main() -> int:
         print("::warning::APIFY_TOKEN not set, no posts collected")
         return 0
 
-    scorer = try_load_scorer()
     failures = 0
     for node_key, location_id in locs.items():
-        since = ig.since_date(node_key) or (today - timedelta(days=args.first_days)).isoformat()
         try:
-            store(scrape(location_id, since, args.limit, token), node_key, location_id, args.limit, since,
-                  today.isoformat(), scorer)
+            store_total(scrape_total(location_id, token), node_key, location_id, today.isoformat())
         except Exception as e:  # noqa: BLE001 - one failed location shouldn't lose the others
             failures += 1
             print(f"  {node_key}: failed this run: {e}")

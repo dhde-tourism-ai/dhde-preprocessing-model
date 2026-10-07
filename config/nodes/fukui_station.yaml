@@ -78,11 +78,8 @@ sources:
     adult_num: 2
 
   instagram:
-    enabled: false
-    reason: >
-      Instagram location id not found yet. Look it up with the Collect
-      Instagram posts workflow (find_places: 福井駅, Fukui Station), then set
-      location_id and enabled: true.
+    enabled: true  # weekly post total via Apify (collect-instagram.yml); see sources/instagram.py
+    location_id: "237741681"  # instagram.com/explore/locations/237741681/, 福井駅, 10,482 posts; the main station tag (東口 has 219) (checked 2026-10-07)
 
   social_listening:
     enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py

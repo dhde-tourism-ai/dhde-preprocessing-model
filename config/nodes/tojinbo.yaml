@@ -76,11 +76,8 @@ sources:
     adult_num: 2
 
   instagram:
-    enabled: false
-    reason: >
-      Instagram location id not found yet. Look it up with the Collect
-      Instagram posts workflow (find_places: 東尋坊, Tojinbo), then set
-      location_id and enabled: true.
+    enabled: true  # weekly post total via Apify (collect-instagram.yml); see sources/instagram.py
+    location_id: "471212962983288"  # instagram.com/explore/locations/471212962983288/, 東尋坊, 38,979 posts; at the cliffs, the most used of several 東尋坊 tags (checked 2026-10-07)
 
   social_listening:
     enabled: true  # Bluesky, YouTube, Reddit posts naming the site, weekly (collect-social.yml); see sources/social_listening.py
