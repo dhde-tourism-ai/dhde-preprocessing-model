@@ -12,3 +12,4 @@ code,hazard,level,name_ja,name_en,first_seen,last_seen,report_datetime,active
 16,wave,2,波浪注意報,High waves advisory,2026-10-21T10:11+00:00,2026-10-22T04:50+00:00,2026-10-21T16:26:00+09:00,False
 14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-24T23:17+00:00,2026-10-25T04:44+00:00,2026-10-25T04:39:00+09:00,False
 10,rain,2,レベル２大雨注意報,Heavy rain advisory (level 2),2026-10-25T04:44+00:00,2026-10-25T04:44+00:00,2026-10-25T10:09:00+09:00,False
+14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-25T23:18+00:00,2026-10-25T23:18+00:00,2026-10-26T04:10:00+09:00,True
