@@ -9,3 +9,4 @@ code,hazard,level,name_ja,name_en,first_seen,last_seen,report_datetime,active
 15,wind,2,強風注意報,Strong wind advisory,2026-10-20T23:54+00:00,2026-10-21T04:51+00:00,2026-10-21T04:09:00+09:00,False
 14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-24T23:17+00:00,2026-10-25T04:44+00:00,2026-10-25T04:39:00+09:00,False
 14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-25T23:18+00:00,2026-10-26T04:50+00:00,2026-10-26T04:10:00+09:00,False
+15,wind,2,強風注意報,Strong wind advisory,2026-10-27T13:14+00:00,2026-10-27T13:14+00:00,2026-10-27T16:15:00+09:00,True
