@@ -6,3 +6,4 @@ code,hazard,level,name_ja,name_en,first_seen,last_seen,report_datetime,active
 14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-20T17:10+00:00,2026-10-21T10:11+00:00,2026-10-20T22:13:00+09:00,False
 14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-24T23:17+00:00,2026-10-25T04:44+00:00,2026-10-25T04:39:00+09:00,False
 14,thunder,2,雷注意報,Thunderstorm advisory,2026-10-25T23:18+00:00,2026-10-26T04:50+00:00,2026-10-26T04:10:00+09:00,False
+24,frost,2,霜注意報,Frost advisory,2026-10-28T06:53+00:00,2026-10-28T06:53+00:00,2026-10-28T14:33:00+09:00,True
