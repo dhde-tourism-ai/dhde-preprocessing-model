@@ -11,3 +11,5 @@ run_date,platform,fetched,capped,covered_from,covered_to
 2026-10-19,youtube,180,True,2026-10-12,2026-10-18
 2026-10-26,bluesky,10,False,2026-10-16,2026-10-25
 2026-10-26,youtube,198,True,2026-10-18,2026-10-25
+2026-11-02,bluesky,21,False,2026-10-23,2026-11-01
+2026-11-02,youtube,228,True,2026-10-24,2026-11-01
