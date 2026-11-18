@@ -24,5 +24,6 @@ code,hazard,level,name_ja,name_en,first_seen,last_seen,report_datetime,active
 15,wind,2,強風注意報,Strong wind advisory,2026-11-09T07:59+00:00,2026-11-09T18:50+00:00,2026-11-09T16:12:00+09:00,False
 16,wave,2,波浪注意報,High waves advisory,2026-11-09T07:59+00:00,2026-11-09T18:50+00:00,2026-11-09T16:12:00+09:00,False
 24,frost,2,霜注意報,Frost advisory,2026-11-10T12:41+00:00,2026-11-10T12:41+00:00,2026-11-10T14:39:00+09:00,False
-15,wind,2,強風注意報,Strong wind advisory,2026-11-18T02:55+00:00,2026-11-18T02:55+00:00,2026-11-18T10:27:00+09:00,True
-14,thunder,2,雷注意報,Thunderstorm advisory,2026-11-18T02:55+00:00,2026-11-18T02:55+00:00,2026-11-18T11:49:00+09:00,True
+15,wind,2,強風注意報,Strong wind advisory,2026-11-18T02:55+00:00,2026-11-18T11:44+00:00,2026-11-18T16:19:00+09:00,True
+14,thunder,2,雷注意報,Thunderstorm advisory,2026-11-18T02:55+00:00,2026-11-18T11:44+00:00,2026-11-18T11:49:00+09:00,True
+16,wave,2,波浪注意報,High waves advisory,2026-11-18T11:44+00:00,2026-11-18T11:44+00:00,2026-11-18T16:19:00+09:00,True
